@@ -5,7 +5,7 @@ import networkx as nx
 import scipy.stats
 
 class Benchmark(object):
-    def __init__(self, p_low=0.1, p_high=.5, tau=50):
+    def __init__(self, p_in=1, p_out=0, tau=50):
         self.rng = random.Random()
 
         n = 32
@@ -15,9 +15,11 @@ class Benchmark(object):
 
         nodes = c1 | c2
 
-        managers = [Static(self, c1, p=p_high),
-                    Static(self, c2, p=p_high),
-                    Merging(self, c1, c2, p_low=p_low, p_high=p_high, tau=tau),
+        managers = [#Static(self, c1, p=p_in),
+                    #Static(self, c2, p=p_in),
+                    #Merging(self, c1,c2, p_low=p_out, p_high=p_in, tau=tau),
+                    ExpandContract(self, c1,c2,
+                                   p_in=p_in, p_out=p_out, tau=tau),
                     ]
         self.managers = managers
         self.g = g = nx.Graph()
@@ -32,6 +34,15 @@ class Benchmark(object):
             mgr.t(g, t)
 
         return g
+
+
+def shuffled(rng, x):
+    if isinstance(x, list):
+        x = x[:]    # force a copy
+    else:
+        x = list(x)
+    rng.shuffle(x)
+    return x
 
 def choose_random_edges(c1, c2=None, m=None, rng=None):
     # One community internal edges
@@ -143,6 +154,104 @@ class Merging(object):
         edges = self.edges[:int(round(m))]
         g.add_edges_from(edges)
 
+
+class ExpandContract(object):
+    def __init__(self, bm, c1, c2, p_in, p_out, tau, fraction=.5):
+        self.c1 = c1
+        self.c2 = c2
+        self.bm = bm
+        self.fraction = fraction
+        assert len(c1 & c2) == 0, "Communities must not overlap"
+        self.tau = tau
+
+        self.order1 = order1 = sorted(shuffled(self.bm.rng, c1))
+        self.order2 = order2 = sorted(shuffled(self.bm.rng, c2))
+
+        self.int_1_edges = int_1_edges = { }
+        self.ext_2_edges = ext_2_edges = { }
+        self.int_2_edges = int_2_edges = { }
+        self.ext_1_edges = ext_1_edges = { }
+        self.order = order = order1 + list(reversed(order2))
+        N = len(order)
+
+        for i, node in enumerate(order):
+            # Internal edges from node to c1
+            assert node in order
+            if i > 0:
+                n_edges = scipy.stats.binom(i, p_in).rvs()
+                es = self.bm.rng.sample(order[:i], n_edges)
+                int_1_edges[node] = es
+                #if i >= self.fraction*len(c1): assert n_edges > 0
+                assert node not in es
+            else:
+                int_1_edges[node] = []
+
+            # External edges from node to c1
+            if i > 0:
+                n_edges = scipy.stats.binom(i, p_out).rvs()
+                es = self.bm.rng.sample(order[:i], n_edges)
+                ext_1_edges[node] = es
+                assert node not in es
+
+            # Internal edges from node to c2
+            if i < N-1:
+                n_edges = scipy.stats.binom(N-1-i, p_in).rvs()
+                es = self.bm.rng.sample(order[i+1:], n_edges)
+                int_2_edges[node] = es
+                #if i <= N-self.fraction*len(c2): assert n_edges > 0
+                assert node not in es
+            else:
+                int_2_edges[node] = []
+
+
+            # External edges from node to c2
+            if i < N-1:
+                n_edges = scipy.stats.binom(N-1-i, p_out).rvs()
+                es = self.bm.rng.sample(order[i+1:], n_edges)
+                ext_2_edges[node] = es
+                assert node not in es
+
+
+
+
+    def fraction_at_t(self, t):
+        # mod1(x) = x - floor(x)   # gnuplot
+        def mod1(x): return x % 1.0
+
+        x = t / float(self.tau)
+        x = 2 *abs(mod1(x+.5 -.75)-.5)  # .5-1-0-.5 with period 1
+        return x
+
+    def t(self, g, t):
+        x = self.fraction_at_t(t)
+        #bound = int(round(len(self.order)*x))
+        low = len(self.c1)*(1-self.fraction)
+        high = len(self.c1) + self.fraction*len(self.c2)
+        y = x*low + (1-x) * high
+        c1 = int(round(y))
+
+        print 'merging c1:', x, y, c1
+
+        def add_edge(n1, n2):
+            assert not g.has_edge(n1, n2)
+            g.add_edge(n1, n2)
+
+        for i in range(0, c1):
+            n1 = self.order[i]
+            #print n1, len(self.int_1_edges[n1]), len(self.ext_2_edges[n1])
+            for n2 in self.int_1_edges[n1]:
+                #print 'a 1 i', n1, n2
+                add_edge(n1, n2)
+                #print 'a 2 e', n1, n2
+            for n2 in self.ext_2_edges[n1]:
+                add_edge(n1, n2)
+        for i in range(c1, len(self.order)):
+            n1 = self.order[i]
+            #print n1, len(self.ext_1_edges[n1]), len(self.int_2_edges[n1])
+            for n2 in self.ext_1_edges[n1]:
+                add_edge(n1, n2)
+            for n2 in self.int_2_edges[n1]:
+                add_edge(n1, n2)
 
 
 if __name__ == "__main__":
