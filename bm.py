@@ -345,18 +345,42 @@ class StdMixed(Benchmark):
             for n in c:
                 g.add_node(n)
 
-
-
-if __name__ == "__main__":
+def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("bm_model", help="benchmark model to simulate")
+
+    parser.add_argument("output", help="Output prefix", nargs='?')
+
+    group = parser.add_argument_group(title="Model parameters", description=None)
+    parser.add_argument("--q", help="Number of communities", type=int, default=4)
+    parser.add_argument("--n", help="", type=int, default=32)
+    parser.add_argument("--p_in", help="Internal edge density", type=float, default=1.)
+    parser.add_argument("--p_out", help="External edge density",type=float, default=0.)
+    parser.add_argument("--k_in",  type=int, default=None)
+    parser.add_argument("--k_out", type=int, default=None)
+    #parser.add_argument("--", help="", type=int, default=)
+    model_params_names = ['q', 'n', 'p_in', 'p_out']
+
     args = parser.parse_args()
+
+    model_params = dict((name, getattr(args, name)) for name in model_params_names)
+    print model_params
+    if args.k_in is not None:
+        model_params['p_in']  = args.k_in  / float(args.n - 1)
+        model_params['p_out'] = args.k_out / float(args.n)
 
 
     bm = globals()[args.bm_model]#StdGrow() #Benchmark()
-    bm = bm()
+    bm = bm(**model_params)
     for t in range(64 + 1):
         g = bm.t(t)
+        if args.output:
+            prefix = args.output + '.t%05d'%t
+            nx.write_edgelist(g, prefix+'.edges', data=False)
         print t, len(g), g.number_of_edges()
 
+
+
+if __name__ == "__main__":
+    main()
