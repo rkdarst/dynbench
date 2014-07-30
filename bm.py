@@ -44,6 +44,10 @@ def shuffled(rng, x):
     rng.shuffle(x)
     return x
 
+def add_edge_nonexists(g, n1, n2):
+    assert not g.has_edge(n1, n2)
+    g.add_edge(n1, n2)
+
 def choose_random_edges(c1, c2=None, m=None, rng=None):
     # One community internal edges
     if c2 is None:
@@ -110,14 +114,16 @@ class Static(object):
                                            rng=self.bm.rng)
 
     def t(self, g, t):
-        g.add_edges_from(self.edges_active)
+        for a,b in self.edges_active:
+            add_edge_nonexists(g, a, b)
+        #g.add_edges_from(self.edges_active)
 
         if self.c2 is None:
             assert len(nx.connected_components(g.subgraph(self.c1))) == 1
 
 
 class Merging(object):
-    def __init__(self, bm, c1, c2, p_low, p_high, tau):
+    def __init__(self, bm, c1, c2, p_low, p_high, tau, phasefactor=0.):
         self.bm = bm
         self.n_links = n_links = len(c1) * len(c2)
 
@@ -126,6 +132,7 @@ class Merging(object):
         self.m_low  = scipy.stats.binom(n_links, p_low ).rvs()
         self.m_high = scipy.stats.binom(n_links, p_high).rvs()
         self.tau = tau
+        self.phasefactor = phasefactor
 
         edges_possible = choose_random_edges(c1=c1, c2=c2,
                                              m=self.m_high,
@@ -135,7 +142,7 @@ class Merging(object):
     def m_at_t(self, t):
         tau = self.tau
         # Sawtooth profile
-        x =  t/float(self.tau)
+        x =  t/float(self.tau) + self.phasefactor
         x = ((x + .5)  % 1) - .5
         x = abs(x)
         x *= 2  # scale to max of 1 / min of 2
@@ -152,17 +159,22 @@ class Merging(object):
     def t(self, g, t):
         m = self.m_at_t(t)
         edges = self.edges[:int(round(m))]
-        g.add_edges_from(edges)
+        #g.add_edges_from(edges)
+        for a,b in edges:
+            add_edge_nonexists(g, a, b)
+
 
 
 class ExpandContract(object):
-    def __init__(self, bm, c1, c2, p_in, p_out, tau, fraction=.5):
+    def __init__(self, bm, c1, c2, p_in, p_out, tau, fraction=.5,
+                 phasefactor=0.):
         self.c1 = c1
         self.c2 = c2
         self.bm = bm
         self.fraction = fraction
         assert len(c1 & c2) == 0, "Communities must not overlap"
         self.tau = tau
+        self.phasefactor = phasefactor
 
         self.order1 = order1 = sorted(shuffled(self.bm.rng, c1))
         self.order2 = order2 = sorted(shuffled(self.bm.rng, c2))
@@ -218,7 +230,7 @@ class ExpandContract(object):
         # mod1(x) = x - floor(x)   # gnuplot
         def mod1(x): return x % 1.0
 
-        x = t / float(self.tau)
+        x = t / float(self.tau) + self.phasefactor
         x = 2 *abs(mod1(x+.5 -.75)-.5)  # .5-1-0-.5 with period 1
         return x
 
@@ -230,33 +242,121 @@ class ExpandContract(object):
         y = x*low + (1-x) * high
         c1 = int(round(y))
 
-        print 'merging c1:', x, y, c1
-
-        def add_edge(n1, n2):
-            assert not g.has_edge(n1, n2)
-            g.add_edge(n1, n2)
+        #print 'merging c1:', x, y, c1
 
         for i in range(0, c1):
             n1 = self.order[i]
             #print n1, len(self.int_1_edges[n1]), len(self.ext_2_edges[n1])
             for n2 in self.int_1_edges[n1]:
                 #print 'a 1 i', n1, n2
-                add_edge(n1, n2)
+                add_edge_nonexists(g, n1, n2)
                 #print 'a 2 e', n1, n2
             for n2 in self.ext_2_edges[n1]:
-                add_edge(n1, n2)
+                add_edge_nonexists(g, n1, n2)
         for i in range(c1, len(self.order)):
             n1 = self.order[i]
             #print n1, len(self.ext_1_edges[n1]), len(self.int_2_edges[n1])
             for n2 in self.ext_1_edges[n1]:
-                add_edge(n1, n2)
+                add_edge_nonexists(g, n1, n2)
             for n2 in self.int_2_edges[n1]:
-                add_edge(n1, n2)
+                add_edge_nonexists(g, n1, n2)
+
+
+class StdMerge(Benchmark):
+    def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=64):
+        self.rng = random.Random()
+
+        if q%2 != 0:
+            raise ValueError("q must be a multiple of two (given: q=%s)"%q)
+
+        cs = [set(range(n*i, n*(i+1))) for i in range(q)]
+
+        managers = [ ]
+        for i in range(q//2):
+            managers.append(
+                Merging(self, cs[2*i], cs[2*i+1],
+                        p_high=p_in, p_low=p_out, tau=tau,
+                        phasefactor=i/float(q//2)))
+            managers.append(Static(self, cs[2*i],   p=p_in))
+            managers.append(Static(self, cs[2*i+1], p=p_in))
+            for j in range(i+1, q//2):
+                Static(self, cs[2*i]|cs[2*i+1],  cs[2*j]|cs[2*j+1], p=p_out),
+        self.managers = managers
+        self.g = g = nx.Graph()
+
+        for c in cs:
+            for n in c:
+                g.add_node(n)
+
+class StdGrow(Benchmark):
+    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=64):
+        self.rng = random.Random()
+
+        if q%2 != 0:
+            raise ValueError("q must be a multiple of two (given: q=%s)"%q)
+
+        cs = [set(range(n*i, n*(i+1))) for i in range(q)]
+
+        managers = [ ]
+        for i in range(q//4):
+            managers.append(
+                ExpandContract(self, cs[2*i+2], cs[2*i+3],
+                               p_in=p_in, p_out=p_out, tau=tau,
+                               phasefactor=i/float(q//4)))
+            for j in range(i+1, q//4):
+                Static(self, cs[2*i]|cs[2*i+1],  cs[2*j]|cs[2*j+1], p=p_out),
+        self.managers = managers
+
+        self.g = g = nx.Graph()
+        # Add all initial nodes to the graph
+        for c in cs:
+            for n in c:
+                g.add_node(n)
+
+class StdMixed(Benchmark):
+    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=64):
+        self.rng = random.Random()
+
+        if q%4 != 0:
+            raise ValueError("q must be a multiple of four (given: q=%s)"%q)
+
+        cs = [set(range(n*i, n*(i+1))) for i in range(q)]
+
+        managers = [ ]
+        for i in range(q//4):
+            managers.append(
+                Merging(self, cs[4*i], cs[4*i+1],
+                        p_high=p_in, p_low=p_out, tau=tau,
+                        phasefactor=i/float(q//4)))
+            managers.append(Static(self, cs[4*i],   p=p_in))
+            managers.append(Static(self, cs[4*i+1], p=p_in))
+            managers.append(
+                ExpandContract(self, cs[4*i+2], cs[4*i+3],
+                               p_in=p_in, p_out=p_out, tau=tau,
+                               phasefactor=i/float(q//4)))
+            for j in range(i+1, q//4):
+                Static(self, cs[4*i]|cs[4*i+1]|cs[4*i+2]|cs[4*i+3],
+                             cs[4*j]|cs[4*j+1]|cs[4*j+2]|cs[4*j+3], p=p_out),
+        self.managers = managers
+
+        self.g = g = nx.Graph()
+        # Add all initial nodes to the graph
+        for c in cs:
+            for n in c:
+                g.add_node(n)
+
 
 
 if __name__ == "__main__":
-    bm = Benchmark()
-    for t in range(50):
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("bm_model", help="benchmark model to simulate")
+    args = parser.parse_args()
+
+
+    bm = globals()[args.bm_model]#StdGrow() #Benchmark()
+    bm = bm()
+    for t in range(64 + 1):
         g = bm.t(t)
         print t, len(g), g.number_of_edges()
 
