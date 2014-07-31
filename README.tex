@@ -27,51 +27,76 @@ community benchmark.
   are given at $0\tau$, $.01\tau$, etc, instead of one snapshot being
   the addition of one edge or one node.  Reason: For the merging
   benchmark, since $p$ is fixed, not the number of edges, there is a
-  different number of edges in each benchmark.  It is ideal to have
+  different number of edges needed to be added in each instance.  It is ideal to have
   the critical points (completely split, completely merged) at the
-  same time points in all benchmarks.  Further, when merging and
+  same time points in all instances.  Further, when merging and
   expansion are coupled, we need a way to make a consistent time
   scale.  This is the easiest way.
 \item The configurations are programmed as a certain state at a certain
   time, not as a dynamic process generating a certain state.  This
   means it easiest to always ensure that the model always matches a
-  given ensemble.
+  given ensemble.  You can immediately generate (and check) state at
+  time $t$ without going through all times $[0,t)$.
 \item Care is paid to time and space complexity of all operations.
-  There are no $O(N^2)$ time or space operations.
+  There are no $O(N^2)$ time or space operations and everything is
+  $O(N*k)$ or $O(M)$.
+\item At every step, the communities are checked for connectedness,
+  since there is no model-level guarantee of connectedness.  If graph
+  is disconnected, abort.  This can be changed to ``resample and
+  continue'' if we want to change the ensemble.
 \item The model is programmed with defensive programming techniques
-  (e.g. arxiv:1210.0530) to prevent bugs, and will be fully tested.
-\item Everything is fully modular.  A generic merging operation is
+  (e.g. arxiv:1210.0530) to prevent bugs, and will have a full test suite.
+\item Everything is fully modular.  For example, a generic dynamic merging operation is
   defined between two communities, and this can be applied to any
   realization of the benchmark, possibly multiple times.  This leads
-  to most flexibility and least possibility of bugs being introduced.
+  to most flexibility, reusability, and least possibility of bugs being introduced.
 \item The benchmark is written in Python and depends only on the
   \texttt{networkx} package for graphs.  This makes for the most
-  flexible deployment on the most number of systems and easiest to
-  have flexibility and low time and space complexity.
-\item The three ``standard'' benchmarks will be presets.  The defaults
+  flexible deployment on the most number of systems, and easiest to
+  implement flexibility and customizability.
+\item The three ``standard'' benchmarks are presets.  The defaults
   will be set as we want, but they can also have $n$ ,$q$, $\pin$,
-  $\pout$, customized.  I can also have other ``advanced'' versions
+  and $\pout$ (and probably more) customized.  I can also have other
+  ``advanced'' versions
   for testing.
 \item Public and open source project.  git repository:
   https://git.becs.aalto.fi/rkdarst/dynbench
 \end{itemize}
 
 
+
+\section{Static mechanism}
+\begin{itemize}
+\item A community $A$ has $n$ nodes.
+\item Each edge within $A$ (between two nodes in $A$, excluding
+  self-edges) is made with probability $\pin$.  These edges never
+  change and remain static throughout the life of the benchmark.
+\item This could be expanded to a ``dynamic equilibrium'' mechanism
+  where, on each step, $x$ possible pairs of nodes are re-sampled from
+  the distribution.
+\item This mechanism can also apply to two communities $A$ and $B$,
+  then considering edges between $A$ and $B$ instead of within them.
+  This is used for ``external'' edges between non-interacting
+  communities, with edge density $\pout$.
+\end{itemize}
+
+
+
 \section{Merging mechanism}
 
 \begin{itemize}
 \item Two communities, $A$ and $B$, are initialized with $n$ nodes.
-\item Each edge within $A$ (between two nodes in $A$, excluding
-  self-edges) is made with probability $\pin$.  These edges never
-  change and remain static throughout the life of the benchmark.  The
-  same is done for $B$.
+\item Edges internal to $A$ and $B$ are managed with the ``Static''
+  mechanism above.
 \item The edge density of edges \textsl{between} communities ranges
   from $\pout$ in the split state to $\pin$ in the merged state.
   Thus, at the two endpoints, the graph is a standard SBM graph and at
-  the other endpoint, an ER graph with $\pin$.  Note that the
+  the other endpoint, an ER random graph with $\pin$.  Note that the
   \textsl{actual} edge density (edges divided by edges possible) in
-  the fully merged state can be lower than the internal densities of
-  the two sides, but they are chosen from the same distribution.
+  the fully merged state can be higher or lower than the
+  \textsl{actual} internal densities of
+  the two sides, but they are chosen from the same distribution.  This
+  is a natural consequence of being an ER random graph.
 \item The exact number of edges $m_\low$ in the split state is chosen
   from the binomial distribution $\mathcal{B}(n, \pout)$.  The exact
   number of edges $m_\high$ in the merged state is chosen from the
@@ -80,11 +105,15 @@ community benchmark.
   values.
   \begin{itemize}
   \item In particular, this means that at the halfway point, the
-    number of edges is $(m_\high+m_\low)/2$, not chosen from a
+    number of edges is $(m_\high+m_\low)/2$, and not chosen from a
     binomial distribution with $(\pin+\pout)/2$.  We are only in a
-    random graph ensemble at the endpoints.
+    random graph ensemble at the endpoints.  Otherwise, the number of
+    edges will fluctuate up and down as time passes, which was
+    requested to not happen.
+  \item This also means the same number of new edges are added on each
+    step.
   \end{itemize}
-\item Time is defined, with linear interpolation between these
+\item Time is defined with linear interpolation between these
   points.  Alternative formulations are easy to add due to the
   implementation above.
   \begin{itemize}
@@ -92,26 +121,29 @@ community benchmark.
   \item $t'={1 \over 2} \tau$, fully merged state.
   \item $t'=\tau$, split state.
   \end{itemize}
-  $t'$ is the normalized time, $t' = t \mathrm{mod} \tau + \Phi$.  $\Phi$ is a
+  $t'$ is the normalized time, $t' = t ~ \mathrm{mod} ~ \tau + \phi$.  $\phi$ is a
   phase factor.
 \end{itemize}
+
+
 
 \section{Expansion/contraction mechanism.}
 \begin{itemize}
 \item Two communities, $A$ and $B$, have $n$ nodes.  A fraction $f$
   defines the fraction of each community that is moved to the other
-  community.  Our initial convention is $f=.5$.  Each community has an
+  community.  Our initial convention is $f=.5$ (this makes the 16 to
+  48 split).  Each community has an
   internal edge density $\pin$ and all links between any two nodes in
   different communities are present with independent probability
   $\pout$.
-\item At the ``left'' side, $A$ has $n_A(1-f)$ nodes and $B$ has
-  $n_b+f n_A$ nodes.  At the ``right'' side, $A$ has $n_A + f n_B$
+\item At the ``left'' state, $A$ has $n_A(1-f)$ nodes and $B$ has
+  $n_b+f n_A$ nodes.  At the ``right'' state, $A$ has $n_A + f n_B$
   nodes and $B$ has $n_b(1-f)$ nodes.  (This can be generalized to
   different numbers of nodes in $A$ and $B$, as you see here.)
-\item A time interpolation is done between
-\item Time is defined, with linear interpolation between these
-  points.  Alternative formulations are easy to add due to the
-  implementation above.
+\item A time interpolation is done between these two states.  This is
+  a linear interpolation in number of nodes, but this can also be
+  easily adjusted in one function.  Critical time points are defined
+  as such:
   \begin{itemize}
   \item $t'=0$, equal sized communities.
   \item $t'={1 \over 4} \tau$, $A$ is smallest and $B$ is largest.
@@ -119,10 +151,35 @@ community benchmark.
   \item $t'={3 \over 4} \tau$, $A$ is largest and $B$ is smallest.
   \item $t'=\tau$, equal sized communities.
   \end{itemize}
-  $t'$ is the normalized time, $t' = t \mathrm{mod} \tau + \Phi$.  $\Phi$ is a
+  $t'$ is the normalized time, $t' = t \mathrm{mod} \tau + \phi$.  $\phi$ is a
   phase factor.
 \item If a community is ever disconnected, raise an error and abort.
 \end{itemize}
+
+
+
+\section{Standard benchmarks}
+
+\textbf{This section is written poorly and unfinished.  I should
+  describe how different $q$ works and make this more rigorous.}
+
+\subsection{Standard - Merging}
+Four communities.  0 and 1 merging, 2 and 3 merging with phase
+factors of 0 and .5.  Internal nodes are with ``static'' mechanism with
+edge density $\pin$.  All other links between \{0,1\} and \{2,3\} are
+managed by ``static'' with edge density $\pout$.
+
+\subsection{Standard - Merging}
+Four communities.  0 and 1 ``growing'', 2 and 3 ``growing'' with phase
+factors of 0 and .5.  All other links between \{0,1\} and \{2,3\} are
+managed by ``static'' with edge density $\pout$.
+
+\subsection{Standard - Mixed}
+Four communities.  0 and 1 ``merging'', 2 and 3 ``growing'' with phase
+factors of 0 and 0.  All other links between \{0,1\} and \{2,3\} are
+managed by ``static'' with edge density $\pout$.
+
+
 
 \section{Sample usage}
 
@@ -132,6 +189,8 @@ community benchmark.
 \item \texttt{./bm.py StdMixed output-prefix}
 \item \texttt{./bm.py StdMerge output-prefix --n=32 --q=16 --p\_in=.5 --p\_out=.1}
 \item \texttt{./bm.py StdMerge output-prefix --k\_in=16 --k\_out=3}
+\item Specifying with k\_in instead of p\_in will automatically
+  calculate $p$s on a PER COMMUNITY basis.  Total external edges are $k_\out(q-1)$.
 \end{itemize}
 
 
