@@ -1,11 +1,12 @@
 import math
 import random
+import sys
 
 import networkx as nx
 import scipy.stats
 
 class Benchmark(object):
-    def __init__(self, p_in=1, p_out=0, tau=50):
+    def __init__(self, p_in=1, p_out=0, tau=100):
         self.rng = random.Random()
 
         n = 32
@@ -32,8 +33,12 @@ class Benchmark(object):
         g = self.g.copy()
         for mgr in self.managers:
             mgr.t(g, t)
-
         return g
+    def comms(self, t):
+        comms = [ ]
+        for mrg in self.managers:
+            comms.extend(mrg.comms(t))
+        return comms
 
 
 def shuffled(rng, x):
@@ -120,12 +125,16 @@ class Static(object):
 
         if self.c2 is None:
             assert len(nx.connected_components(g.subgraph(self.c1))) == 1
+    def comms(self, t):
+        return [ ]
 
 
 class Merging(object):
     def __init__(self, bm, c1, c2, p_low, p_high, tau, phasefactor=0.):
         self.bm = bm
         self.n_links = n_links = len(c1) * len(c2)
+        self.c1 = c1
+        self.c2 = c2
 
         self.p_low = p_low
         self.p_high = p_high
@@ -139,19 +148,20 @@ class Merging(object):
                                              rng=self.bm.rng)
         self.edges = edges_possible
 
-    def m_at_t(self, t):
+    def x_at_t(self, t):
         tau = self.tau
         # Sawtooth profile
         x =  t/float(self.tau) + self.phasefactor
-        x = ((x + .5)  % 1) - .5
-        x = abs(x)
-        x *= 2  # scale to max of 1 / min of 2
-        m = self.m_low + x*(self.m_high-self.m_low)
-        return m
-        # Cosine profile
-        x = t / float(self.tau)
-        omega = 2*pi*x
-        x = -.5*(math.cos(omega)-1)
+        x = ((x + .5)  % 1) - .5   # x \in (-.5, .5]
+        x = abs(x)                 # x \in [0,   .5]
+        x *= 2                     # x \in [0,   1]
+        ## Cosine profile
+        #x = t / float(self.tau)
+        #omega = 2*pi*x
+        #x = -.5*(math.cos(omega)-1)
+        return x
+    def m_at_t(self, t):
+        x = self.x_at_t(t)
         m = self.m_low + x*(self.m_high-self.m_low)
         return m
 
@@ -162,6 +172,11 @@ class Merging(object):
         #g.add_edges_from(edges)
         for a,b in edges:
             add_edge_nonexists(g, a, b)
+    def comms(self, t):
+        x = self.x_at_t(t)
+        if x < 1:
+            return [self.c1, self.c2]
+        return [set.union(self.c1, self.c2)]
 
 
 
@@ -226,22 +241,27 @@ class ExpandContract(object):
 
 
 
-    def fraction_at_t(self, t):
+    def x_at_t(self, t):
         # mod1(x) = x - floor(x)   # gnuplot
         def mod1(x): return x % 1.0
 
         x = t / float(self.tau) + self.phasefactor
         x = 2 *abs(mod1(x+.5 -.75)-.5)  # .5-1-0-.5 with period 1
         return x
-
-    def t(self, g, t):
-        x = self.fraction_at_t(t)
+    def c1_size_at_t(self, t):
+        x = self.x_at_t(t)
         #bound = int(round(len(self.order)*x))
         low = len(self.c1)*(1-self.fraction)
         high = len(self.c1) + self.fraction*len(self.c2)
         y = x*low + (1-x) * high
         c1 = int(round(y))
+        return c1
+    def comms(self, t):
+        c1 = self.c1_size_at_t(t)
+        return [self.order[:c1], self.order[c1:]]
 
+    def t(self, g, t):
+        c1 = self.c1_size_at_t(t)
         #print 'merging c1:', x, y, c1
 
         for i in range(0, c1):
@@ -263,7 +283,7 @@ class ExpandContract(object):
 
 
 class StdMerge(Benchmark):
-    def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=64):
+    def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100):
         self.rng = random.Random()
 
         if q%2 != 0:
@@ -289,7 +309,7 @@ class StdMerge(Benchmark):
                 g.add_node(n)
 
 class StdGrow(Benchmark):
-    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=64):
+    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100):
         self.rng = random.Random()
 
         if q%2 != 0:
@@ -314,7 +334,7 @@ class StdGrow(Benchmark):
                 g.add_node(n)
 
 class StdMixed(Benchmark):
-    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=64):
+    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100):
         self.rng = random.Random()
 
         if q%4 != 0:
@@ -345,41 +365,56 @@ class StdMixed(Benchmark):
             for n in c:
                 g.add_node(n)
 
-def main():
+def main(argv=sys.argv):
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("bm_model", help="benchmark model to simulate")
 
     parser.add_argument("output", help="Output prefix", nargs='?')
+    parser.add_argument("--t",  type=int, help="Maximum time to simulate",
+                        default=100)
 
-    group = parser.add_argument_group(title="Model parameters", description=None)
-    parser.add_argument("--q", help="Number of communities", type=int, default=4)
-    parser.add_argument("--n", help="", type=int, default=32)
-    parser.add_argument("--p_in", help="Internal edge density", type=float, default=1.)
-    parser.add_argument("--p_out", help="External edge density",type=float, default=0.)
-    parser.add_argument("--k_in",  type=int, default=None)
-    parser.add_argument("--k_out", type=int, default=None)
+    group =parser.add_argument_group(title="Model parameters",description=None)
+    parser.add_argument("--q", help="Number of communities", type=int)
+    parser.add_argument("--n", help="", type=int)
+    parser.add_argument("--p_in", help="Internal edge density", type=float)
+    parser.add_argument("--p_out", help="External edge density",type=float)
+    parser.add_argument("--k_in",  type=int)
+    parser.add_argument("--k_out", type=int)
+    parser.add_argument("--tau",   type=int)
     #parser.add_argument("--", help="", type=int, default=)
-    model_params_names = ['q', 'n', 'p_in', 'p_out']
+    model_params_names = ['q', 'n', 'p_in', 'p_out', 'tau']
 
-    args = parser.parse_args()
+    print argv
+    args = parser.parse_args(args=argv[1:])
 
-    model_params = dict((name, getattr(args, name)) for name in model_params_names)
+    model_params = dict((name, getattr(args, name))
+                        for name in model_params_names
+                        if getattr(args, name) is not None)
     print model_params
     if args.k_in is not None:
         model_params['p_in']  = args.k_in  / float(args.n - 1)
+    if args.k_out is not None:
         model_params['p_out'] = args.k_out / float(args.n)
 
 
     bm = globals()[args.bm_model]#StdGrow() #Benchmark()
     bm = bm(**model_params)
-    for t in range(64 + 1):
+    for t in range(args.t + 1):
         g = bm.t(t)
         if args.output:
             prefix = args.output + '.t%05d'%t
             nx.write_edgelist(g, prefix+'.edges', data=False)
+            comms = bm.comms(t)
+            f = open(prefix+'.comms', 'w')
+            write_comms(f, comms)
+
         print t, len(g), g.number_of_edges()
 
+
+def write_comms(f, comms):
+    for nodes in comms:
+        print >> f, " ".join(str(x) for x in nodes)
 
 
 if __name__ == "__main__":
