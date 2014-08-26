@@ -365,7 +365,8 @@ class StdMixed(Benchmark):
             for n in c:
                 g.add_node(n)
 
-def main(argv=sys.argv):
+
+def main_argv(argv=sys.argv):
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("bm_model", help="benchmark model to simulate")
@@ -397,9 +398,16 @@ def main(argv=sys.argv):
     if args.k_out is not None:
         model_params['p_out'] = args.k_out / float(args.n)
 
+    return get_model(args.bm_model, **model_params)
 
-    bm = globals()[args.bm_model]#StdGrow() #Benchmark()
-    bm = bm(**model_params)
+def get_model(name=None, **kwargs):
+    """Return a given model names, instantiated with **kwargs"""
+    bm = globals()[name]
+    bm = bm(**kwargs)
+    return bm
+
+def main(argv=sys.argv):
+    bm = main_argv(argv)
     for t in range(args.t + 1):
         g = bm.t(t)
         if args.output:
