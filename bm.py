@@ -127,6 +127,16 @@ class Static(object):
             assert len(nx.connected_components(g.subgraph(self.c1))) == 1
     def comms(self, t):
         return [ ]
+    def manages(self, a, b):
+        """Return true if two nodes link is managed by this object"""
+        if self.c2 is None:
+            if a in self.c1 and b in self.c1:
+                return True
+        else:
+            if (   (a in self.c1 and b in self.c2)
+                or (b in self.c1 and a in self.c2)):
+                return True
+        return False
 
 
 class Merging(object):
@@ -147,6 +157,12 @@ class Merging(object):
                                              m=self.m_high,
                                              rng=self.bm.rng)
         self.edges = edges_possible
+    def manages(self, a, b):
+        """Return true if two nodes link is managed by this object"""
+        if (   (a in self.c1 and b in self.c2)
+            or (b in self.c1 and a in self.c2)):
+            return True
+        return False
 
     def x_at_t(self, t):
         tau = self.tau
@@ -237,9 +253,12 @@ class ExpandContract(object):
                 es = self.bm.rng.sample(order[i+1:], n_edges)
                 ext_2_edges[node] = es
                 assert node not in es
-
-
-
+    def manages(self, a, b):
+        """Return true if two nodes link is managed by this object"""
+        nodes = set.union(self.c1, self.c2)
+        if len(set((a,b)) & nodes) == 2:
+            return True
+        return False
 
     def x_at_t(self, t):
         # mod1(x) = x - floor(x)   # gnuplot
