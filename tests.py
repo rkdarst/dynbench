@@ -40,3 +40,9 @@ def test():
     f = lambda : 1
 
     assert_distribution(f, 1, 0)
+
+import bm
+
+def test_1():
+    M = bm.get_model('StdGrow')
+    assert len(M.t(0)) == 128
