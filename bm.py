@@ -5,6 +5,11 @@ import sys
 import networkx as nx
 import scipy.stats
 
+import logging
+logger = logging.getLogger(__name__)
+debug = logger.debug
+info = logger.info
+
 class Benchmark(object):
     def __init__(self, p_in=1, p_out=0, tau=100):
         self.rng = random.Random()
