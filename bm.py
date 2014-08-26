@@ -312,18 +312,20 @@ class StdMerge(Benchmark):
 
         managers = [ ]
         for i in range(q//2):
+            c0 = 2*i
+            c1 = 2*i+1
             managers.append(
-                Merging(self, cs[2*i], cs[2*i+1],
+                Merging(self, cs[c0], cs[c1],
                         p_high=p_in, p_low=p_out, tau=tau,
                         phasefactor=i/float(q//2)))
-            managers.append(Static(self, cs[2*i],   p=p_in))
-            managers.append(Static(self, cs[2*i+1], p=p_in))
+            managers.append(Static(self, cs[c0], p=p_in))
+            managers.append(Static(self, cs[c1], p=p_in))
             for j in range(i+1, q//2):
+                d0 = 2*j
+                d1 = 2*j+1
                 managers.append(
-                    Static(self,
-                           c1=cs[2*i]|cs[2*i+1],
-                           c2=cs[2*j]|cs[2*j+1],
-                           p=p_out))
+                    Static(self, c1=cs[c0]|cs[c1],
+                                 c2=cs[d0]|cs[d1], p=p_out))
         self.managers = managers
         self.g = g = nx.Graph()
 
@@ -342,16 +344,18 @@ class StdGrow(Benchmark):
 
         managers = [ ]
         for i in range(q//2):
+            c0 = 2*i
+            c1 = 2*i+1
             managers.append(
-                ExpandContract(self, cs[2*i+0], cs[2*i+1],
+                ExpandContract(self, cs[c0], cs[c1],
                                p_in=p_in, p_out=p_out, tau=tau,
                                phasefactor=i/float(q//2)))
             for j in range(i+1, q//2):
+                d0 = 2*j
+                d1 = 2*j+1
                 managers.append(
-                    Static(self,
-                           cs[2*i]|cs[2*i+1],
-                           cs[2*j]|cs[2*j+1],
-                           p=p_out))
+                    Static(self, cs[c0]|cs[c1],
+                                 cs[d0]|cs[d1], p=p_out))
         self.managers = managers
 
         self.g = g = nx.Graph()
@@ -371,22 +375,24 @@ class StdMixed(Benchmark):
 
         managers = [ ]
         for i in range(q//4):
+            c0, c1, c2, c3 = 4*i, 4*i+1, 4*i+2, 4*i+3
             managers.append(
-                Merging(self, cs[4*i], cs[4*i+1],
+                Merging(self, cs[c0], cs[c1],
                         p_high=p_in, p_low=p_out, tau=tau,
                         phasefactor=i/float(q//4)))
-            managers.append(Static(self, cs[4*i],   p=p_in))
-            managers.append(Static(self, cs[4*i+1], p=p_in))
+            managers.append(Static(self, cs[c0], p=p_in))
+            managers.append(Static(self, cs[c1], p=p_in))
             managers.append(
-                ExpandContract(self, cs[4*i+2], cs[4*i+3],
+                ExpandContract(self, cs[c2], cs[c3],
                                p_in=p_in, p_out=p_out, tau=tau,
                                phasefactor=i/float(q//4)))
-            managers.append(Static(self, cs[4*i]|cs[4*i+1],
-                                   cs[4*i+2]|cs[4*i+3], p=p_out))
+            managers.append(Static(self, cs[c0]|cs[c1],
+                                         cs[c2]|cs[c3], p=p_out))
             for j in range(i+1, q//4):
+                d0, d1, d2, d3 = 4*j, 4*j+1, 4*j+2, 4*j+3
                 managers.append(
-                    Static(self, cs[4*i]|cs[4*i+1]|cs[4*i+2]|cs[4*i+3],
-                           cs[4*j]|cs[4*j+1]|cs[4*j+2]|cs[4*j+3], p=p_out),
+                    Static(self, cs[c0]|cs[c1]|cs[c2]|cs[c3],
+                                 cs[d0]|cs[d1]|cs[d2]|cs[d3], p=p_out),
                     )
         self.managers = managers
 
