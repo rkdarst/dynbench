@@ -300,7 +300,11 @@ class StdMerge(Benchmark):
             managers.append(Static(self, cs[2*i],   p=p_in))
             managers.append(Static(self, cs[2*i+1], p=p_in))
             for j in range(i+1, q//2):
-                Static(self, cs[2*i]|cs[2*i+1],  cs[2*j]|cs[2*j+1], p=p_out),
+                managers.append(
+                    Static(self,
+                           c1=cs[2*i]|cs[2*i+1],
+                           c2=cs[2*j]|cs[2*j+1],
+                           p=p_out))
         self.managers = managers
         self.g = g = nx.Graph()
 
@@ -318,13 +322,17 @@ class StdGrow(Benchmark):
         cs = [set(range(n*i, n*(i+1))) for i in range(q)]
 
         managers = [ ]
-        for i in range(q//4):
+        for i in range(q//2):
             managers.append(
-                ExpandContract(self, cs[2*i+2], cs[2*i+3],
+                ExpandContract(self, cs[2*i+0], cs[2*i+1],
                                p_in=p_in, p_out=p_out, tau=tau,
-                               phasefactor=i/float(q//4)))
-            for j in range(i+1, q//4):
-                Static(self, cs[2*i]|cs[2*i+1],  cs[2*j]|cs[2*j+1], p=p_out),
+                               phasefactor=i/float(q//2)))
+            for j in range(i+1, q//2):
+                managers.append(
+                    Static(self,
+                           cs[2*i]|cs[2*i+1],
+                           cs[2*j]|cs[2*j+1],
+                           p=p_out))
         self.managers = managers
 
         self.g = g = nx.Graph()
@@ -354,9 +362,13 @@ class StdMixed(Benchmark):
                 ExpandContract(self, cs[4*i+2], cs[4*i+3],
                                p_in=p_in, p_out=p_out, tau=tau,
                                phasefactor=i/float(q//4)))
+            managers.append(Static(self, cs[4*i]|cs[4*i+1],
+                                   cs[4*i+2]|cs[4*i+3], p=p_out))
             for j in range(i+1, q//4):
-                Static(self, cs[4*i]|cs[4*i+1]|cs[4*i+2]|cs[4*i+3],
-                             cs[4*j]|cs[4*j+1]|cs[4*j+2]|cs[4*j+3], p=p_out),
+                managers.append(
+                    Static(self, cs[4*i]|cs[4*i+1]|cs[4*i+2]|cs[4*i+3],
+                           cs[4*j]|cs[4*j+1]|cs[4*j+2]|cs[4*j+3], p=p_out),
+                    )
         self.managers = managers
 
         self.g = g = nx.Graph()
