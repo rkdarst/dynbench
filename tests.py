@@ -2,7 +2,9 @@ import itertools
 import math
 import numpy as np
 import scipy.stats as stats
+import unittest
 
+import networkx as nx
 from nose.tools import *
 
 
@@ -35,6 +37,13 @@ def assert_distribution(f, mean, std, p=.1):
 
 def test_assert_dist():
     assert_distribution(stats.norm(0).rvs, 0, 1)
+
+def assert_compnents(g, n=1):
+    ccs = nx.connected_components(g)
+    n_ccs = len(ccs)
+    if n != n_ccs:
+        raise AssertionError("Number of connected components wrong: %s!=%s (%s)"%(
+            n, n_ccs, [len(cc) for cc in ccs]))
 
 
 def test():
@@ -69,6 +78,90 @@ def test_all_managed():
     assert_all_managed(bm.get_model('StdMixed', q=8))
 
 
-def test_1():
-    M = bm.get_model('StdGrow')
-    assert len(M.t(0)) == 128
+class _TestRandom(unittest.TestCase):
+    model_name = None
+
+    def test_size(self):
+        M = bm.get_model(self.model_name)
+        assert len(M.t(0)) == 128
+    def test_all_managed(self):
+        assert_all_managed(bm.get_model(self.model_name))
+        assert_all_managed(bm.get_model(self.model_name, q=8))
+        assert_all_managed(bm.get_model(self.model_name, p_in=.5, p_out=.5))
+
+
+    def test_random(self):
+        #class Binom():
+        #    def __init__(self, n, p):
+        #        self.n, self.p = n, p
+        #    def rvs(self):
+        #        return int(round(self.n*self.p))
+        #import scipy.stats
+        #scipy.stats.binom = Binom
+
+        def getM():
+            return bm.get_model(self.model_name, p_in=.5, p_out=.5)
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            128*127/2 * .5, std=None)
+
+        def getM():
+            return bm.get_model(self.model_name, p_in=.6, p_out=.6)
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            128*127/2 * .6, std=None)
+
+        def getM():
+            return bm.get_model(self.model_name, p_in=.6, p_out=.6, q=8)
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            256*255/2 * .6, std=None)
+
+        def getM():
+            return bm.get_model(self.model_name, p_in=.6, p_out=.6)
+        assert_distribution(lambda: getM().t(50).number_of_edges(),
+                            128*127/2 * .6, std=None)
+
+        def getM():
+            return bm.get_model(self.model_name, p_in=.6, p_out=.6)
+        assert_distribution(lambda: getM().t(75).number_of_edges(),
+                            128*127/2 * .6, std=None)
+
+        def getM():
+            return bm.get_model(self.model_name, p_in=.6, p_out=.6)
+        assert_distribution(lambda: getM().t(25).number_of_edges(),
+                            128*127/2 * .6, std=None)
+
+
+    def test_ccs(self):
+        M = bm.get_model(self.model_name, p_in=.5, p_out=0)
+        g = M.t(0)
+        assert_compnents(g, getattr(self, 'n_ccs', 4))
+
+        g = M.t(50)
+        assert_compnents(g, getattr(self, 'n_ccs', 4))
+
+        g = M.t(25)
+        assert_compnents(g, getattr(self, 'n_ccs_off', 4))
+
+class TestMerge(_TestRandom):
+    model_name = 'StdMerge'
+    n_ccs = 3  # 3 conected components
+    n_ccs_off = 2
+    def test_ccs(self):
+        M = bm.get_model(self.model_name, p_in=.5, p_out=0)
+        g = M.t(0);   assert_compnents(g, 3)
+        g = M.t(50);  assert_compnents(g, 3)
+        g = M.t(25);  assert_compnents(g, 2)
+class TestGrow(_TestRandom):
+    model_name = 'StdGrow'
+    def test_ccs(self):
+        M = bm.get_model(self.model_name, p_in=.5, p_out=0)
+        g = M.t(0);   assert_compnents(g, 4)
+        g = M.t(50);  assert_compnents(g, 4)
+        g = M.t(25);  assert_compnents(g, 4)
+class TestMixed(_TestRandom):
+    model_name = 'StdMixed'
+    def test_ccs(self):
+        M = bm.get_model(self.model_name, p_in=.5, p_out=0)
+        g = M.t(0);   assert_compnents(g, 4)
+        g = M.t(50);  assert_compnents(g, 3)
+        g = M.t(25);  assert_compnents(g, 3)
+
