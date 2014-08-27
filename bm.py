@@ -290,10 +290,12 @@ class ExpandContract(object):
         return [self.order[:c1], self.order[c1:]]
 
     def t(self, g, t):
-        c1 = self.c1_size_at_t(t)
+        c1size = self.c1_size_at_t(t)
         #print 'merging c1:', x, y, c1
+        c1 = set(self.order[:c1size])
+        c2 = set(self.order[c1size:])
 
-        for i in range(0, c1):
+        for i in range(0, c1size):
             n1 = self.order[i]
             #print n1, len(self.int_1_edges[n1]), len(self.ext_2_edges[n1])
             for n2 in self.int_1_edges[n1]:
@@ -301,12 +303,15 @@ class ExpandContract(object):
                 add_edge_nonexists(g, n1, n2)
                 #print 'a 2 e', n1, n2
             for n2 in self.ext_2_edges[n1]:
-                add_edge_nonexists(g, n1, n2)
-        for i in range(c1, len(self.order)):
+                if n2 in c2:
+                #if n2 > n1:
+                    add_edge_nonexists(g, n1, n2)
+        for i in range(c1size, len(self.order)):
             n1 = self.order[i]
             #print n1, len(self.ext_1_edges[n1]), len(self.int_2_edges[n1])
-            for n2 in self.ext_1_edges[n1]:
-                add_edge_nonexists(g, n1, n2)
+            #for n2 in self.ext_1_edges[n1]:
+            #    if n1 > n2:
+            #        add_edge_nonexists(g, n1, n2)
             for n2 in self.int_2_edges[n1]:
                 add_edge_nonexists(g, n1, n2)
 
