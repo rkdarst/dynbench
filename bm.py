@@ -21,7 +21,7 @@ class Benchmark(object):
         n = 32
 
         self.c1 = c1 = set(range(0, n  ))
-        self.c1 = c2 = set(range(n, n*2))
+        self.c2 = c2 = set(range(n, n*2))
 
         nodes = c1 | c2
 
