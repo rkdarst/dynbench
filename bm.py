@@ -116,16 +116,19 @@ class Static(object):
         self.bm = bm
         assert p is not None
 
+        debug("Static, c2=%s", type(c2))
         # Number of total possible edges
         if c2 is None:
             n_links = len(c1) * (len(c1)-1) / 2
         else:
             n_links = len(c1) * len(c2)
+        debug("Static, meanlinks=%s, n_links=%s, p=%s", p*n_links, n_links, p)
         # Number of actual edges
         n_edges = scipy.stats.binom(n_links, p).rvs()
 
         self.edges_active = choose_random_edges(c1=c1, c2=c2, m=n_edges,
                                            rng=self.bm.rng)
+        debug("Static, links=%s", len(self.edges_active))
 
     def t(self, g, t):
         for a,b in self.edges_active:
@@ -153,6 +156,7 @@ class Merging(object):
     def __init__(self, bm, c1, c2, p_low, p_high, tau, phasefactor=0.):
         self.bm = bm
         self.n_links = n_links = len(c1) * len(c2)
+        debug("Merging, meanlinks_low=%s, meanlinks_high=%s", p_low*n_links, p_high*n_links)
         self.c1 = c1
         self.c2 = c2
 
@@ -160,6 +164,8 @@ class Merging(object):
         self.p_high = p_high
         self.m_low  = scipy.stats.binom(n_links, p_low ).rvs()
         self.m_high = scipy.stats.binom(n_links, p_high).rvs()
+        debug("Merging, links_low=%s, links_high=%s, p_low=%s, p_high=%s",
+              self.m_low, self.m_high, p_low, p_high)
         self.tau = tau
         self.phasefactor = phasefactor
 
@@ -189,6 +195,7 @@ class Merging(object):
     def m_at_t(self, t):
         x = self.x_at_t(t)
         m = self.m_low + x*(self.m_high-self.m_low)
+        debug('Merging: x, m: %s %s %s %s', x, m, self.m_low, self.m_high)
         return m
 
 
@@ -236,8 +243,10 @@ class ExpandContract(object):
                 int_1_edges[node] = es
                 #if i >= self.fraction*len(c1): assert n_edges > 0
                 assert node not in es
+                debug('ExpandContract: Int. c1, %s %s', node, sorted(es))
             else:
                 int_1_edges[node] = []
+                debug('ExpandContract: Int. c1, %s %s', node, [])
 
             # External edges from node to c1
             if i > 0:
@@ -245,6 +254,7 @@ class ExpandContract(object):
                 es = self.bm.rng.sample(order[:i], n_edges)
                 ext_1_edges[node] = es
                 assert node not in es
+                debug('ExpandContract: Ext. c1, %s %s', node, sorted(es))
 
             # Internal edges from node to c2
             if i < N-1:
@@ -253,8 +263,10 @@ class ExpandContract(object):
                 int_2_edges[node] = es
                 #if i <= N-self.fraction*len(c2): assert n_edges > 0
                 assert node not in es
+                debug('ExpandContract: Int. c2, %s %s', node, sorted(es))
             else:
                 int_2_edges[node] = []
+                debug('ExpandContract: Int. c2, %s %s', node, [])
 
 
             # External edges from node to c2
@@ -263,6 +275,7 @@ class ExpandContract(object):
                 es = self.bm.rng.sample(order[i+1:], n_edges)
                 ext_2_edges[node] = es
                 assert node not in es
+                debug('ExpandContract: Ext. c2, %s %s', node, sorted(es))
     def manages(self, a, b):
         """Return true if two nodes link is managed by this object"""
         nodes = set.union(self.c1, self.c2)
@@ -292,16 +305,19 @@ class ExpandContract(object):
     def t(self, g, t):
         c1size = self.c1_size_at_t(t)
         #print 'merging c1:', x, y, c1
+        debug('ExpandContract: t=%s, c1=%s', t, c1size)
         c1 = set(self.order[:c1size])
         c2 = set(self.order[c1size:])
 
         for i in range(0, c1size):
             n1 = self.order[i]
             #print n1, len(self.int_1_edges[n1]), len(self.ext_2_edges[n1])
+            debug("ExpandContract: adding, c1, Int. %s, %s", n1, sorted(self.int_1_edges[n1]))
             for n2 in self.int_1_edges[n1]:
                 #print 'a 1 i', n1, n2
                 add_edge_nonexists(g, n1, n2)
                 #print 'a 2 e', n1, n2
+            debug("ExpandContract: adding, c1, Ext. %s, %s", n1, sorted(self.ext_2_edges[n1]))
             for n2 in self.ext_2_edges[n1]:
                 if n2 in c2:
                 #if n2 > n1:
@@ -309,9 +325,11 @@ class ExpandContract(object):
         for i in range(c1size, len(self.order)):
             n1 = self.order[i]
             #print n1, len(self.ext_1_edges[n1]), len(self.int_2_edges[n1])
+            #debug("ExpandContract: adding, c1, Ext. %s, %s", n1, sorted(self.ext_1_edges[n1]))
             #for n2 in self.ext_1_edges[n1]:
             #    if n1 > n2:
             #        add_edge_nonexists(g, n1, n2)
+            debug("ExpandContract: adding, c1, Ext. %s, %s", n1, sorted(self.int_2_edges[n1]))
             for n2 in self.int_2_edges[n1]:
                 add_edge_nonexists(g, n1, n2)
 
