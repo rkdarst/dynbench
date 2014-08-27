@@ -31,7 +31,7 @@ def assert_distribution(f, mean, std, p=.1):
         if p2 > p:
             print "passed with N=%s"%N
             return True   # test passed
-    raise AssertionError("Test failed, (%s !> %s) with %s samples"%(p2, p, N))
+    raise AssertionError("Test failed, %s!=%s(std=%s) (%s !< %s) with %s samples"%(mean, smean, sstd, p, p2, N))
 
 def test_assert_dist():
     assert_distribution(stats.norm(0).rvs, 0, 1)
