@@ -59,7 +59,7 @@ def shuffled(rng, x):
     return x
 
 def add_edge_nonexists(g, n1, n2):
-    assert not g.has_edge(n1, n2)
+    assert not g.has_edge(n1, n2), "Graph has %s-%s."%(n1, n2)
     g.add_edge(n1, n2)
 
 def choose_random_edges(c1, c2=None, m=None, rng=None):
