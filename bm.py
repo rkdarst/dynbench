@@ -10,6 +10,10 @@ logger = logging.getLogger(__name__)
 debug = logger.debug
 info = logger.info
 
+class DisconnectedError(Exception):
+    pass
+
+
 class Benchmark(object):
     def __init__(self, p_in=1, p_out=0, tau=100):
         self.rng = random.Random()
@@ -129,7 +133,8 @@ class Static(object):
         #g.add_edges_from(self.edges_active)
 
         if self.c2 is None:
-            assert len(nx.connected_components(g.subgraph(self.c1))) == 1
+            if len(nx.connected_components(g.subgraph(self.c1))) != 1:
+                raise DisconnectedError("Subgraph is disconnected (Static object)")
     def comms(self, t):
         return [ ]
     def manages(self, a, b):
