@@ -478,16 +478,16 @@ def get_model(name=None, **kwargs):
 
 def main(argv=sys.argv):
     bm = main_argv(argv)
-    for t in range(args.t + 1):
+    for t in range(100 + 1):
         g = bm.t(t)
-        if args.output:
+        comms = bm.comms(t)
+        if False:#args.output:
             prefix = args.output + '.t%05d'%t
             nx.write_edgelist(g, prefix+'.edges', data=False)
-            comms = bm.comms(t)
             f = open(prefix+'.comms', 'w')
             write_comms(f, comms)
 
-        print t, len(g), g.number_of_edges()
+        print t, len(g), g.number_of_edges(), len(comms)
 
 
 def write_comms(f, comms):
