@@ -141,6 +141,14 @@ class _TestRandom(unittest.TestCase):
         g = M.t(25)
         assert_compnents(g, getattr(self, 'n_ccs_off', 4))
 
+    def test_num_comms(self):
+        M = bm.get_model(self.model_name, p_in=.5, p_out=0)
+        assert_equal(len(M.comms(0)),   4)
+        assert_equal(len(M.comms(25)),  4)
+        assert_equal(len(M.comms(50)),  4)
+        assert_equal(len(M.comms(85)),  4)
+        assert_equal(len(M.comms(100)), 4)
+
 class TestMerge(_TestRandom):
     model_name = 'StdMerge'
     n_ccs = 3  # 3 conected components
@@ -150,6 +158,13 @@ class TestMerge(_TestRandom):
         g = M.t(0);   assert_compnents(g, 3)
         g = M.t(50);  assert_compnents(g, 3)
         g = M.t(25);  assert_compnents(g, 2)
+    def test_num_comms(self):
+        M = bm.get_model(self.model_name, p_in=.5, p_out=0)
+        assert_equal(len(M.comms(0)),   3)
+        assert_equal(len(M.comms(25)),  4)
+        assert_equal(len(M.comms(50)),  3)
+        assert_equal(len(M.comms(85)),  4)
+        assert_equal(len(M.comms(100)), 3)
 class TestGrow(_TestRandom):
     model_name = 'StdGrow'
     def test_ccs(self):
@@ -164,4 +179,11 @@ class TestMixed(_TestRandom):
         g = M.t(0);   assert_compnents(g, 4)
         g = M.t(50);  assert_compnents(g, 3)
         g = M.t(25);  assert_compnents(g, 3)
+    def test_num_comms(self):
+        M = bm.get_model(self.model_name, p_in=.5, p_out=0)
+        assert_equal(len(M.comms(0)),   4)
+        assert_equal(len(M.comms(25)),  4)
+        assert_equal(len(M.comms(50)),  3)
+        assert_equal(len(M.comms(85)),  4)
+        assert_equal(len(M.comms(100)), 4)
 
