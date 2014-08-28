@@ -44,9 +44,12 @@ class Benchmark(object):
             mgr.t(g, t)
         return g
     def comms(self, t):
-        comms = [ ]
+        comms = { }
         for mrg in self.managers:
-            comms.extend(mrg.comms(t))
+            for cname, cnodes in mrg.comms(t).iteritems():
+                if cname in comms:
+                    raise ValueError("Duplicate community name: %s"%cname)
+                comms[cname] = cnodes
         return comms
 
 
@@ -139,7 +142,7 @@ class Static(object):
             if len(nx.connected_components(g.subgraph(self.c1))) != 1:
                 raise DisconnectedError("Subgraph is disconnected (Static object)")
     def comms(self, t):
-        return [ ]
+        return { }
     def manages(self, a, b):
         """Return true if two nodes link is managed by this object"""
         if self.c2 is None:
@@ -153,12 +156,15 @@ class Static(object):
 
 
 class Merging(object):
-    def __init__(self, bm, c1, c2, p_low, p_high, tau, phasefactor=0.):
+    def __init__(self, bm, c1, c2, p_low, p_high, tau, phasefactor=0.,
+                 c_id_1=0, c_id_2=1):
         self.bm = bm
         self.n_links = n_links = len(c1) * len(c2)
         debug("Merging, meanlinks_low=%s, meanlinks_high=%s", p_low*n_links, p_high*n_links)
         self.c1 = c1
         self.c2 = c2
+        self.c_id_1 = c_id_1
+        self.c_id_2 = c_id_2
 
         self.p_low = p_low
         self.p_high = p_high
@@ -208,14 +214,17 @@ class Merging(object):
     def comms(self, t):
         x = self.x_at_t(t)
         if x < 1:
-            return [self.c1, self.c2]
-        return [set.union(self.c1, self.c2)]
+            return {self.c_id_1: self.c1,
+                    self.c_id_2: self.c2}
+        # What is the proper form of this?  We shouldn't reuse c_id_1
+        # since it is now a different community.
+        return {self.c_id_1: set.union(self.c1, self.c2)}
 
 
 
 class ExpandContract(object):
     def __init__(self, bm, c1, c2, p_in, p_out, tau, fraction=.5,
-                 phasefactor=0.):
+                 phasefactor=0., c_id_1=0, c_id_2=1):
         self.c1 = c1
         self.c2 = c2
         self.bm = bm
@@ -223,6 +232,8 @@ class ExpandContract(object):
         assert len(c1 & c2) == 0, "Communities must not overlap"
         self.tau = tau
         self.phasefactor = phasefactor
+        self.c_id_1 = c_id_1
+        self.c_id_2 = c_id_2
 
         self.order1 = order1 = sorted(shuffled(self.bm.rng, c1))
         self.order2 = order2 = sorted(shuffled(self.bm.rng, c2))
@@ -300,7 +311,8 @@ class ExpandContract(object):
         return c1
     def comms(self, t):
         c1 = self.c1_size_at_t(t)
-        return [self.order[:c1], self.order[c1:]]
+        return {self.c_id_1: self.order[:c1],
+                self.c_id_2: self.order[c1:]}
 
     def t(self, g, t):
         c1size = self.c1_size_at_t(t)
@@ -350,7 +362,8 @@ class StdMerge(Benchmark):
             managers.append(
                 Merging(self, cs[c0], cs[c1],
                         p_high=p_in, p_low=p_out, tau=tau,
-                        phasefactor=i/float(q//2)))
+                        phasefactor=i/float(q//2),
+                        c_id_1=c0, c_id_2=c1))
             managers.append(Static(self, cs[c0], p=p_in))
             managers.append(Static(self, cs[c1], p=p_in))
             for j in range(i+1, q//2):
@@ -382,7 +395,8 @@ class StdGrow(Benchmark):
             managers.append(
                 ExpandContract(self, cs[c0], cs[c1],
                                p_in=p_in, p_out=p_out, tau=tau,
-                               phasefactor=i/float(q//2)))
+                               phasefactor=i/float(q//2),
+                               c_id_1=c0, c_id_2=c1))
             for j in range(i+1, q//2):
                 d0 = 2*j
                 d1 = 2*j+1
@@ -412,13 +426,15 @@ class StdMixed(Benchmark):
             managers.append(
                 Merging(self, cs[c0], cs[c1],
                         p_high=p_in, p_low=p_out, tau=tau,
-                        phasefactor=i/float(q//4)))
+                        phasefactor=i/float(q//4),
+                        c_id_1=c0, c_id_2=c1))
             managers.append(Static(self, cs[c0], p=p_in))
             managers.append(Static(self, cs[c1], p=p_in))
             managers.append(
                 ExpandContract(self, cs[c2], cs[c3],
                                p_in=p_in, p_out=p_out, tau=tau,
-                               phasefactor=i/float(q//4)))
+                               phasefactor=i/float(q//4),
+                               c_id_1=c2, c_id_2=c3))
             managers.append(Static(self, cs[c0]|cs[c1],
                                          cs[c2]|cs[c3], p=p_out))
             for j in range(i+1, q//4):
@@ -491,7 +507,7 @@ def main(argv=sys.argv):
 
 
 def write_comms(f, comms):
-    for nodes in comms:
+    for nodes in comms.iteritems():
         print >> f, " ".join(str(x) for x in nodes)
 
 
