@@ -102,32 +102,32 @@ class _TestRandom(unittest.TestCase):
         def getM():
             return bm.get_model(self.model_name, p_in=.5, p_out=.5)
         assert_distribution(lambda: getM().t(0).number_of_edges(),
-                            128*127/2 * .5, std=None, p=.05)
+                            128*127/2 * .5, std=None, p=.01)
 
         def getM():
             return bm.get_model(self.model_name, p_in=.6, p_out=.6)
         assert_distribution(lambda: getM().t(0).number_of_edges(),
-                            128*127/2 * .6, std=None, p=.05)
+                            128*127/2 * .6, std=None, p=.01)
 
         def getM():
             return bm.get_model(self.model_name, p_in=.6, p_out=.6, q=8)
         assert_distribution(lambda: getM().t(0).number_of_edges(),
-                            256*255/2 * .6, std=None, p=.05)
+                            256*255/2 * .6, std=None, p=.01)
 
         def getM():
             return bm.get_model(self.model_name, p_in=.6, p_out=.6)
         assert_distribution(lambda: getM().t(50).number_of_edges(),
-                            128*127/2 * .6, std=None, p=.05)
+                            128*127/2 * .6, std=None, p=.01)
 
         def getM():
             return bm.get_model(self.model_name, p_in=.6, p_out=.6)
         assert_distribution(lambda: getM().t(75).number_of_edges(),
-                            128*127/2 * .6, std=None, p=.05)
+                            128*127/2 * .6, std=None, p=.01)
 
         def getM():
             return bm.get_model(self.model_name, p_in=.6, p_out=.6)
         assert_distribution(lambda: getM().t(25).number_of_edges(),
-                            128*127/2 * .6, std=None, p=.05)
+                            128*127/2 * .6, std=None, p=.01)
 
 
     def test_ccs(self):
