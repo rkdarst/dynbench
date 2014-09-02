@@ -484,7 +484,8 @@ def main_argv(argv=sys.argv):
     if args.k_out is not None:
         model_params['p_out'] = args.k_out / float(args.n)
 
-    return get_model(args.bm_model, **model_params)
+    return (get_model(args.bm_model, **model_params),
+            args)
 
 def get_model(name=None, **kwargs):
     """Return a given model names, instantiated with **kwargs"""
@@ -493,12 +494,17 @@ def get_model(name=None, **kwargs):
     return bm
 
 def main(argv=sys.argv):
-    bm = main_argv(argv)
+    """Main entry point from command line."""
+    bm, args = main_argv(argv)
+    run(bm, output=args.output)
+
+def run(bm, output=None):
+    """Main loop to do a running."""
     for t in range(100 + 1):
         g = bm.t(t)
         comms = bm.comms(t)
-        if False:#args.output:
-            prefix = args.output + '.t%05d'%t
+        if output:
+            prefix = output + '.t%05d'%t
             nx.write_edgelist(g, prefix+'.edges', data=False)
             f = open(prefix+'.comms', 'w')
             write_comms(f, comms)
@@ -507,8 +513,9 @@ def main(argv=sys.argv):
 
 
 def write_comms(f, comms):
-    for nodes in comms.iteritems():
-        print >> f, " ".join(str(x) for x in nodes)
+    for cname, cnodes in comms.iteritems():
+        print >> f, "# label: %s"%cname
+        print >> f, " ".join(str(x) for x in cnodes)
 
 
 if __name__ == "__main__":
