@@ -1,7 +1,10 @@
 import itertools
 import math
 import numpy as np
+import os
 import scipy.stats as stats
+import shutil
+import tempfile
 import unittest
 
 import networkx as nx
@@ -148,6 +151,45 @@ class _TestRandom(unittest.TestCase):
         assert_equal(len(M.comms(50)),  4)
         assert_equal(len(M.comms(85)),  4)
         assert_equal(len(M.comms(100)), 4)
+
+
+    def test_output_bynode(self):
+        """Ensure that main writes output: bynode"""
+        tmpdir = tempfile.mkdtemp(prefix='dynbench-')
+        try:
+            M = bm.main(argv=[bm.__file__, self.model_name,
+                              tmpdir+'/output-1', # outdir
+                              #'--out-format=bynode', # this should be default
+                              ])
+            assert_equal(len(os.listdir(tmpdir)), 202, "202 files should be written")
+            comms = M.comms(2)
+            for line in open(tmpdir+'/output-1.t00002.comms'):
+                if line.startswith("#"): continue
+                n, c = line.split()
+                assert int(n) in comms[int(c)]
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_output_oneline(self):
+        """Ensure that main writes output: oneline"""
+        tmpdir = tempfile.mkdtemp(prefix='dynbench-')
+        try:
+            M = bm.main(argv=[bm.__file__, self.model_name,
+                              tmpdir+'/output-1', # outdir
+                              '--out-format=oneline',
+                              ])
+            assert_equal(len(os.listdir(tmpdir)), 202, "202 files should be written")
+            comms = M.comms(2)
+            for line in open(tmpdir+'/output-1.t00002.comms'):
+                if line.startswith('# label: '):
+                    c = line[9:]
+                if line.startswith("#"): continue
+                nodes = line.split()
+                for n in nodes:
+                    assert int(n) in comms[int(c)]
+        finally:
+            shutil.rmtree(tmpdir)
+
 
 class TestMerge(_TestRandom):
     model_name = 'StdMerge'
