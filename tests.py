@@ -190,6 +190,28 @@ class _TestRandom(unittest.TestCase):
         finally:
             shutil.rmtree(tmpdir)
 
+    def test_seed(self):
+        """Test that seeding does """
+        argv = [bm.__file__, self.model_name,
+                '--p_in=.5', '--p_out=.1']
+        import random
+        random.seed(10)
+        M1a, args = bm.main_argv(argv=argv+['--seed=51'])
+        random.seed(10)
+        M2,  args = bm.main_argv(argv=argv+['--seed=965'])
+        random.seed(10)
+        M1b, args = bm.main_argv(argv=argv+['--seed=51'])
+
+        def edgeset(g):
+            print len(g), g.number_of_edges()
+            return set(frozenset((a, b)) for a,b in g.edges_iter())
+
+        assert_equal(    edgeset(M1a.t(5)), edgeset(M1b.t(5)))
+        #assert_not_equal(edgeset(M2.t(5) ), edgeset(M1a.t(5)))
+        #assert_not_equal(edgeset(M2.t(5) ), edgeset(M1b.t(5)))
+
+
+
 
 class TestMerge(_TestRandom):
     model_name = 'StdMerge'

@@ -1,9 +1,12 @@
+import contextlib
 import math
 import random
 import sys
+import threading
 import time
 
 import networkx as nx
+import numpy.random
 import scipy.stats
 
 import logging
@@ -15,9 +18,32 @@ class DisconnectedError(Exception):
     pass
 
 
+def k_out_limit(kin, q): return kin-.5*( math.sqrt((q-1)**2+(4*q*kin)) - (q-1))
+
+
+_numpy_rng_lock = threading.Lock()
+@contextlib.contextmanager
+def override_numpy_seed(rng):
+    """Temporarily override the numpy random number generator seed.
+
+    scipy.stats uses numpy.random without an interface to set the seed or random number generator state machine.  This is a problem, since we need seeding support.  One could just set numpy.random"""
+    with _numpy_rng_lock:
+        # Ggt old state
+        old_state = numpy.random.get_state()
+        try:
+            numpy.random.seed(rng.randint(0, 2**31-1))
+            yield
+        except:
+            numpy.random.set_state(old_state)
+            raise
+        finally:
+            # Restore old state no matter what.
+            numpy.random.set_state(old_state)
+
+
 class Benchmark(object):
-    def __init__(self, p_in=1, p_out=0, tau=100):
-        self.rng = random.Random()
+    def __init__(self, p_in=1, p_out=0, tau=100, seed=None):
+        self.rng = random.Random(seed)
 
         n = 32
 
@@ -84,8 +110,8 @@ def choose_random_edges(c1, c2=None, m=None, rng=None):
         edges = set()
         for _ in range(m):
             while True:
-                n1 = random.sample(c1, 1)[0]#sets support sample but not choice
-                n2 = random.sample(c2, 1)[0]
+                n1 = rng.sample(c1, 1)[0]#sets support sample but not choice
+                n2 = rng.sample(c2, 1)[0]
                 #print n1, n2
                 if n1 == n2: continue
                 e = frozenset((n1, n2))
@@ -128,7 +154,8 @@ class Static(object):
             n_links = len(c1) * len(c2)
         debug("Static, meanlinks=%s, n_links=%s, p=%s", p*n_links, n_links, p)
         # Number of actual edges
-        n_edges = scipy.stats.binom(n_links, p).rvs()
+        with override_numpy_seed(self.bm.rng):
+            n_edges = scipy.stats.binom(n_links, p).rvs()
 
         self.edges_active = choose_random_edges(c1=c1, c2=c2, m=n_edges,
                                            rng=self.bm.rng)
@@ -169,8 +196,9 @@ class Merging(object):
 
         self.p_low = p_low
         self.p_high = p_high
-        self.m_low  = scipy.stats.binom(n_links, p_low ).rvs()
-        self.m_high = scipy.stats.binom(n_links, p_high).rvs()
+        with override_numpy_seed(self.bm.rng):
+            self.m_low  = scipy.stats.binom(n_links, p_low ).rvs()
+            self.m_high = scipy.stats.binom(n_links, p_high).rvs()
         debug("Merging, links_low=%s, links_high=%s, p_low=%s, p_high=%s",
               self.m_low, self.m_high, p_low, p_high)
         self.tau = tau
@@ -246,7 +274,8 @@ class ExpandContract(object):
         self.order = order = order1 + list(reversed(order2))
         N = len(order)
 
-        for i, node in enumerate(order):
+        with override_numpy_seed(self.bm.rng):
+          for i, node in enumerate(order):
             # Internal edges from node to c1
             assert node in order
             if i > 0:
@@ -348,8 +377,9 @@ class ExpandContract(object):
 
 
 class StdMerge(Benchmark):
-    def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100):
-        self.rng = random.Random()
+    def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100,
+                 seed=None):
+        self.rng = random.Random(seed)
 
         if q%2 != 0:
             raise ValueError("q must be a multiple of two (given: q=%s)"%q)
@@ -381,8 +411,9 @@ class StdMerge(Benchmark):
                 g.add_node(n)
 
 class StdGrow(Benchmark):
-    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100):
-        self.rng = random.Random()
+    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100,
+                 seed=None):
+        self.rng = random.Random(seed)
 
         if q%2 != 0:
             raise ValueError("q must be a multiple of two (given: q=%s)"%q)
@@ -413,8 +444,9 @@ class StdGrow(Benchmark):
                 g.add_node(n)
 
 class StdMixed(Benchmark):
-    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100):
-        self.rng = random.Random()
+    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100,
+                 seed=None):
+        self.rng = random.Random(seed)
 
         if q%4 != 0:
             raise ValueError("q must be a multiple of four (given: q=%s)"%q)
@@ -472,7 +504,9 @@ def main_argv(argv=sys.argv):
     parser.add_argument("--tau",   type=int)
     parser.add_argument("--out-format", default='bynode', help="How to write communities, choices='oneline', 'bynode'.")
     #parser.add_argument("--", help="", type=int, default=)
-    model_params_names = ['q', 'n', 'p_in', 'p_out', 'tau']
+    parser.add_argument("--seed",  default=None, help="Random seed")
+    model_params_names = ['q', 'n', 'p_in', 'p_out', 'tau',
+                          'seed']
 
     print argv
     args = parser.parse_args(args=argv[1:])
