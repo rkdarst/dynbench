@@ -502,7 +502,8 @@ def main_argv(argv=sys.argv):
     parser.add_argument("--k_in",  type=int)
     parser.add_argument("--k_out", type=int)
     parser.add_argument("--tau",   type=int)
-    parser.add_argument("--out-format", default='bynode', help="How to write communities, choices='oneline', 'bynode'.")
+    parser.add_argument("--graph-format", default='edgelist', help="How to write graph, choices='edgelist', 'pajek'.")
+    parser.add_argument("--comm-format", default='bynode', help="How to write communities, choices='oneline', 'bynode', 'pajek'.")
     #parser.add_argument("--", help="", type=int, default=)
     parser.add_argument("--seed",  default=None, help="Random seed")
     model_params_names = ['q', 'n', 'p_in', 'p_out', 'tau',
@@ -532,10 +533,13 @@ def get_model(name=None, **kwargs):
 def main(argv=sys.argv):
     """Main entry point from command line."""
     bm, args = main_argv(argv)
-    run(bm, maxt=args.t, output=args.output, out_format=args.out_format)
+    run(bm, maxt=args.t, output=args.output,
+        graph_format=args.graph_format,
+        comm_format=args.comm_format)
     return bm
 
-def run(bm, maxt=100, output=None, out_format='bynode'):
+def run(bm, maxt=100, output=None, graph_format='edgelist',
+        comm_format='bynode'):
     """Main loop to do a running."""
     for t in range(maxt+1):
         g = bm.t(t)
@@ -543,14 +547,24 @@ def run(bm, maxt=100, output=None, out_format='bynode'):
         if output:
             prefix = output + '.t%05d'%t
             # write graph
-            nx.write_edgelist(g, prefix+'.edges', data=False)
+            if graph_format == 'edgelist':
+                nx.write_edgelist(g, prefix+'.graph', data=False)
+            elif graph_format == 'pajek':
+                for n in g:
+                    g.node[n]['id'] = n+1
+                nx.write_pajek(g, prefix+'.graph')
+            else:
+                graphwriter = getattr(nx, 'write_'+graph_format)
+                graphwriter(g, prefix+'.graph')
             # write communities, in one of two formats
             f = open(prefix+'.comms', 'w')
             label = 't=%s, command line: %s'%(t, ' '.join(sys.argv))
-            if out_format == 'oneline':
+            if comm_format == 'oneline':
                 write_comms_oneline(f, comms, label)
-            elif out_format == 'bynode':
+            elif comm_format == 'bynode':
                 write_comms_bynode(f, comms, label)
+            elif comm_format == 'pajek':
+                write_comms_pajek(f, comms, label)
 
         print t, len(g), g.number_of_edges(), len(comms)
 
@@ -573,6 +587,20 @@ def write_comms_bynode(f, comms, label=None):
     for cname, cnodes in comms.iteritems():
         for node in cnodes:
             print >> f, node, cname
+
+def write_comms_pajek(f, comms, label=None):
+    """Write communities, lines with 'node comm' pairs"""
+    if label:
+        print >> f, '#', label.replace('\n', ' ')
+    print >> f, '#', time.ctime()
+    print >> f, "# Format: cmty_id in node order"
+    print >> f, "*vertices"
+    nodecmtys = { }
+    for cname, cnodes in comms.iteritems():
+        for node in cnodes:
+            nodecmtys[node] = cname
+    for node in sorted(nodecmtys):
+        print >> f, nodecmtys[node]
 
 
 if __name__ == "__main__":

@@ -159,7 +159,7 @@ class _TestRandom(unittest.TestCase):
         try:
             M = bm.main(argv=[bm.__file__, self.model_name,
                               tmpdir+'/output-1', # outdir
-                              #'--out-format=bynode', # this should be default
+                              #'--comm-format=bynode', # this should be default
                               ])
             assert_equal(len(os.listdir(tmpdir)), 202, "202 files should be written")
             comms = M.comms(2)
@@ -176,7 +176,7 @@ class _TestRandom(unittest.TestCase):
         try:
             M = bm.main(argv=[bm.__file__, self.model_name,
                               tmpdir+'/output-1', # outdir
-                              '--out-format=oneline',
+                              '--comm-format=oneline',
                               ])
             assert_equal(len(os.listdir(tmpdir)), 202, "202 files should be written")
             comms = M.comms(2)
