@@ -42,8 +42,9 @@ def override_numpy_seed(rng):
 
 
 class Benchmark(object):
-    def __init__(self, p_in=1, p_out=0, tau=100, seed=None):
-        self.rng = random.Random(seed)
+    def __init__(self, p_in=1, p_out=0, tau=100, opts={}):
+        self.rng = random.Random(opts.get('seed', None))
+        self.opts = opts
 
         n = 32
 
@@ -203,6 +204,8 @@ class Merging(object):
               self.m_low, self.m_high, p_low, p_high)
         self.tau = tau
         self.phasefactor = phasefactor
+        self.p_limit =  k_out_limit(self.p_high*len(c1), 2) / float(len(c1))
+
 
         edges_possible = choose_random_edges(c1=c1, c2=c2,
                                              m=self.m_high,
@@ -232,7 +235,10 @@ class Merging(object):
         m = self.m_low + x*(self.m_high-self.m_low)
         debug('Merging: x, m: %s %s %s %s', x, m, self.m_low, self.m_high)
         return m
-
+    def p_at_t(self, t):
+        x = self.x_at_t(t)
+        p = self.p_low + x*(self.p_high-self.p_low)
+        return p
 
     def t(self, g, t):
         m = self.m_at_t(t)
@@ -241,10 +247,16 @@ class Merging(object):
         for a,b in edges:
             add_edge_nonexists(g, a, b)
     def comms(self, t):
-        x = self.x_at_t(t)
-        if x < 1:
-            return {self.c_id_1: self.c1,
-                    self.c_id_2: self.c2}
+        if self.bm.opts.get('no_det_limit', False):
+            x = self.x_at_t(t)
+            if x < 1:
+                return {self.c_id_1: self.c1,
+                        self.c_id_2: self.c2}
+        else:
+            p = self.p_at_t(t)
+            if p < self.p_limit:
+                return {self.c_id_1: self.c1,
+                        self.c_id_2: self.c2}
         # What is the proper form of this?  We shouldn't reuse c_id_1
         # since it is now a different community.
         return {self.c_id_1: set.union(self.c1, self.c2)}
@@ -378,8 +390,9 @@ class ExpandContract(object):
 
 class StdMerge(Benchmark):
     def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100,
-                 seed=None):
-        self.rng = random.Random(seed)
+                 opts={}):
+        self.rng = random.Random(opts.get('seed', None))
+        self.opts = opts
 
         if q%2 != 0:
             raise ValueError("q must be a multiple of two (given: q=%s)"%q)
@@ -412,8 +425,9 @@ class StdMerge(Benchmark):
 
 class StdGrow(Benchmark):
     def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100,
-                 seed=None):
-        self.rng = random.Random(seed)
+                 opts={}):
+        self.rng = random.Random(opts.get('seed', None))
+        self.opts = opts
 
         if q%2 != 0:
             raise ValueError("q must be a multiple of two (given: q=%s)"%q)
@@ -445,8 +459,9 @@ class StdGrow(Benchmark):
 
 class StdMixed(Benchmark):
     def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100,
-                 seed=None):
-        self.rng = random.Random(seed)
+                 opts={}):
+        self.rng = random.Random(opts.get('seed', None))
+        self.opts = opts
 
         if q%4 != 0:
             raise ValueError("q must be a multiple of four (given: q=%s)"%q)
@@ -506,8 +521,9 @@ def main_argv(argv=sys.argv):
     parser.add_argument("--comm-format", default='bynode', help="How to write communities, choices='oneline', 'bynode', 'pajek'.")
     #parser.add_argument("--", help="", type=int, default=)
     parser.add_argument("--seed",  default=None, help="Random seed")
-    model_params_names = ['q', 'n', 'p_in', 'p_out', 'tau',
-                          'seed']
+    parser.add_argument("--no-det-limit",  action='store_true',
+                        help="No detectability limit")
+    model_params_names = ['q', 'n', 'p_in', 'p_out', 'tau', ]
 
     print argv
     args = parser.parse_args(args=argv[1:])
@@ -521,7 +537,7 @@ def main_argv(argv=sys.argv):
     if args.k_out is not None:
         model_params['p_out'] = args.k_out / float(args.n)
 
-    return (get_model(args.bm_model, **model_params),
+    return (get_model(args.bm_model, opts=args.__dict__, **model_params),
             args)
 
 def get_model(name=None, **kwargs):
@@ -535,11 +551,13 @@ def main(argv=sys.argv):
     bm, args = main_argv(argv)
     run(bm, maxt=args.t, output=args.output,
         graph_format=args.graph_format,
-        comm_format=args.comm_format)
+        comm_format=args.comm_format,
+        opts=args.__dict__)
     return bm
 
 def run(bm, maxt=100, output=None, graph_format='edgelist',
-        comm_format='bynode'):
+        comm_format='bynode',
+        opts={}):
     """Main loop to do a running."""
     for t in range(maxt+1):
         g = bm.t(t)

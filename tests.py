@@ -227,8 +227,35 @@ class TestMerge(_TestRandom):
         assert_equal(len(M.comms(0)),   3)
         assert_equal(len(M.comms(25)),  4)
         assert_equal(len(M.comms(50)),  3)
-        assert_equal(len(M.comms(85)),  4)
+        assert_equal(len(M.comms(75)),  4)
         assert_equal(len(M.comms(100)), 3)
+    def test_det_limit(self):
+        Mnd = bm.get_model(self.model_name, p_in=.5, p_out=0,
+                           opts=dict(no_det_limit=True))
+        Md = bm.get_model(self.model_name, p_in=.5, p_out=0,
+                          opts=dict(no_det_limit=False))
+        # Test the command line no-det-limit option works.
+        argv = [bm.__file__, self.model_name, '/nonexistant', # outdir
+                '--graph-format=null','--comm-format=null']
+        Mnd2, args = bm.main_argv(argv=argv+['--no-det-limit'])
+        # Default shourd be detectability limit.
+        Md2, args = bm.main_argv(argv=argv)
+        assert_equal(len(Mnd.comms(0)),  3)
+        assert_equal(len(Mnd.comms(1)),  4)
+
+        assert_equal(len(Md.comms(0)),   3)
+        assert_equal(len(Md.comms(1)),   3)
+
+        assert_equal(len(Mnd2.comms(0)),  3)
+        assert_equal(len(Mnd2.comms(1)),  4)
+
+        assert_equal(len(Md2.comms(0)),  3)
+        assert_equal(len(Md2.comms(1)),  3)
+
+        #tmpdir = tempfile.mkdtemp(prefix='dynbench-')
+        #try:
+
+
 class TestGrow(_TestRandom):
     model_name = 'StdGrow'
     def test_ccs(self):
