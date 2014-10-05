@@ -553,19 +553,27 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
                 for n in g:
                     g.node[n]['id'] = n+1
                 nx.write_pajek(g, prefix+'.graph')
+            elif graph_format == 'null':
+                pass
             else:
-                graphwriter = getattr(nx, 'write_'+graph_format)
+                try:
+                    graphwriter = getattr(nx, 'write_'+graph_format)
+                except AttributeError:
+                    raise ValueError("Unknown graph format: %s"%graph_format)
                 graphwriter(g, prefix+'.graph')
-            # write communities, in one of two formats
-            f = open(prefix+'.comms', 'w')
-            label = 't=%s, command line: %s'%(t, ' '.join(sys.argv))
-            if comm_format == 'oneline':
-                write_comms_oneline(f, comms, label)
-            elif comm_format == 'bynode':
-                write_comms_bynode(f, comms, label)
-            elif comm_format == 'pajek':
-                write_comms_pajek(f, comms, label)
-
+            # write communities, in desired format.
+            if comm_format == 'oneline':  comm_writer = write_comms_oneline
+            elif comm_format == 'bynode': comm_writer = write_comms_bynode
+            elif comm_format == 'pajek':  comm_writer = write_comms_pajek
+            elif comm_format == 'null':   comm_writer = None
+            else:
+                raise ValueError("Unknown comm format: %s"%comm_format)
+            # Delay opening the file until here, so we can skip it
+            # using the 'null' option.
+            if comm_writer:
+                f = open(prefix+'.comms', 'w')
+                label = 't=%s, command line: %s'%(t, ' '.join(sys.argv))
+                comm_writer(f, comms, label)
         print t, len(g), g.number_of_edges(), len(comms)
 
 
