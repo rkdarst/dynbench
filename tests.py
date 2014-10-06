@@ -10,6 +10,8 @@ import unittest
 import networkx as nx
 from nose.tools import *
 
+# tempdir for tests that require writing.
+TMPDIR = None
 
 def assert_distribution(f, mean, std, p=.1):
     vals = [ ]
@@ -172,7 +174,7 @@ class _TestRandom(unittest.TestCase):
 
     def test_output_bynode(self):
         """Ensure that main writes output: bynode"""
-        tmpdir = tempfile.mkdtemp(prefix='dynbench-')
+        tmpdir = tempfile.mkdtemp(prefix='dynbench-', dir=TMPDIR)
         try:
             M = bm.main(argv=[bm.__file__, self.model_name,
                               tmpdir+'/output-1', # outdir
@@ -189,7 +191,7 @@ class _TestRandom(unittest.TestCase):
 
     def test_output_oneline(self):
         """Ensure that main writes output: oneline"""
-        tmpdir = tempfile.mkdtemp(prefix='dynbench-')
+        tmpdir = tempfile.mkdtemp(prefix='dynbench-', dir=TMPDIR)
         try:
             M = bm.main(argv=[bm.__file__, self.model_name,
                               tmpdir+'/output-1', # outdir
