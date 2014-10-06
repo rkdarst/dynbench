@@ -436,6 +436,8 @@ class ExpandContract(object):
 
 re_k = re.compile('k= *([0-9.]+) *')
 class _StdBase(Benchmark):
+    _default_p_in = 'k=16'
+    _default_p_out = 'k=0'
     def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100,
                  opts={}):
         self.rng = random.Random(opts.get('seed', None))
@@ -451,8 +453,8 @@ class _StdBase(Benchmark):
 
 
 class StdMerge(_StdBase):
-    def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100,
-                 opts={}):
+    def __init__(self, p_in=_StdBase._default_p_in, p_out=_StdBase._default_p_out,
+                 n=32, q=4, tau=100, opts={}):
         super(StdMerge, self).__init__(p_in=p_in, p_out=p_out, n=n, q=q,
                                        tau=tau, opts=opts)
         p_in = self.p_in
@@ -488,8 +490,8 @@ class StdMerge(_StdBase):
                 g.add_node(n)
 
 class StdGrow(_StdBase):
-    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100,
-                 opts={}):
+    def __init__(self, p_in=_StdBase._default_p_in, p_out=_StdBase._default_p_out,
+                 n=32, q=4, tau=100, opts={}):
         super(StdGrow, self).__init__(p_in=p_in, p_out=p_out, n=n, q=q,
                                        tau=tau, opts=opts)
         p_in = self.p_in
@@ -524,8 +526,8 @@ class StdGrow(_StdBase):
                 g.add_node(n)
 
 class StdMixed(_StdBase):
-    def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100,
-                 opts={}):
+    def __init__(self, p_in=_StdBase._default_p_in, p_out=_StdBase._default_p_out,
+                 n=32, q=4, tau=100, opts={}):
         super(StdMixed, self).__init__(p_in=p_in, p_out=p_out, n=n, q=q,
                                        tau=tau, opts=opts)
         p_in = self.p_in
