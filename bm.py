@@ -267,6 +267,8 @@ class Merging(object):
 class ExpandContract(object):
     def __init__(self, bm, c1, c2, p_in, p_out, tau, fraction=.5,
                  phasefactor=0., c_id_1=0, c_id_2=1):
+        self.p_in = p_in
+        self.p_out = p_out
         self.c1 = c1
         self.c2 = c2
         self.bm = bm
@@ -284,8 +286,11 @@ class ExpandContract(object):
         self.ext_2_edges = ext_2_edges = { }
         self.int_2_edges = int_2_edges = { }
         self.ext_1_edges = ext_1_edges = { }
-        self.order = order = order1 + list(reversed(order2))
+        self.order = order = order1 + list(order2)
         N = len(order)
+
+        c1_minsize = int(round(len(c1)*(1-self.fraction)))
+        c1_maxsize = int(round(len(c1)+len(c2)*(self.fraction)))
 
         with override_numpy_seed(self.bm.rng):
           for i, node in enumerate(order):
@@ -295,12 +300,14 @@ class ExpandContract(object):
                 n_edges = scipy.stats.binom(i, p_in).rvs()
                 es = self.bm.rng.sample(order[:i], n_edges)
                 int_1_edges[node] = es
-                #if i >= self.fraction*len(c1): assert n_edges > 0
+                if i >= c1_minsize and n_edges <= 0:
+                    raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n1=%s)"%(
+                                            self.p_in, i))
                 assert node not in es
-                debug('ExpandContract: Int. c1, %s %s', node, sorted(es))
+                debug('ExpandContract: Int. c1=%s, %s %s', self.c_id_1, node, sorted(es))
             else:
                 int_1_edges[node] = []
-                debug('ExpandContract: Int. c1, %s %s', node, [])
+                debug('ExpandContract: Int. c1=%s, %s %s', self.c_id_1, node, [])
 
             # External edges from node to c1
             if i > 0:
@@ -308,28 +315,54 @@ class ExpandContract(object):
                 es = self.bm.rng.sample(order[:i], n_edges)
                 ext_1_edges[node] = es
                 assert node not in es
-                debug('ExpandContract: Ext. c1, %s %s', node, sorted(es))
+                debug('ExpandContract: Ext. c2=%s, %s %s', self.c_id_2, node, sorted(es))
 
             # Internal edges from node to c2
             if i < N-1:
                 n_edges = scipy.stats.binom(N-1-i, p_in).rvs()
                 es = self.bm.rng.sample(order[i+1:], n_edges)
                 int_2_edges[node] = es
-                #if i <= N-self.fraction*len(c2): assert n_edges > 0
+                if i <= c1_maxsize and n_edges <= 0:
+                    raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n2=%s)"%(
+                                            self.p_in, N-i))
                 assert node not in es
-                debug('ExpandContract: Int. c2, %s %s', node, sorted(es))
+                debug('ExpandContract: Int. c2=%s, %s %s', self.c_id_2, node, sorted(es))
             else:
                 int_2_edges[node] = []
-                debug('ExpandContract: Int. c2, %s %s', node, [])
+                debug('ExpandContract: Int. c2=%s, %s %s', self.c_id_2, node, [])
 
 
-            # External edges from node to c2
+            # External edges from node to c1
             if i < N-1:
                 n_edges = scipy.stats.binom(N-1-i, p_out).rvs()
                 es = self.bm.rng.sample(order[i+1:], n_edges)
                 ext_2_edges[node] = es
                 assert node not in es
-                debug('ExpandContract: Ext. c2, %s %s', node, sorted(es))
+                debug('ExpandContract: Ext. c1=%s, %s %s', self.c_id_1, node, sorted(es))
+
+        # Check for connectedness of the minimal size subgraphs
+        g = nx.Graph()
+        for n in order[:c1_minsize]:
+            g.add_node(n)
+            g.add_edges_from((n, n2) for n2 in int_1_edges[n])
+        ccs = nx.connected_components(g)
+        print ccs
+        if len(ccs) != 1:
+            raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n1=%s)"%(
+                                    self.p_in, len(g)))
+        # c2
+        g = nx.Graph()
+        for n in order[c1_maxsize:]:
+            g.add_node(n)
+            g.add_edges_from((n, n2) for n2 in int_2_edges[n])
+        ccs = nx.connected_components(g)
+        print ccs
+        if len(ccs) != 1:
+            raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n2=%s)"%(
+                                    self.p_in, len(g)))
+
+
+
     def manages(self, a, b):
         """Return true if two nodes link is managed by this object"""
         nodes = set.union(self.c1, self.c2)
@@ -367,12 +400,12 @@ class ExpandContract(object):
         for i in range(0, c1size):
             n1 = self.order[i]
             #print n1, len(self.int_1_edges[n1]), len(self.ext_2_edges[n1])
-            debug("ExpandContract: adding, c1, Int. %s, %s", n1, sorted(self.int_1_edges[n1]))
+            #debug("ExpandContract: adding, c1, Int. %s, %s", self.c_id_1, n1, sorted(self.int_1_edges[n1]))
             for n2 in self.int_1_edges[n1]:
                 #print 'a 1 i', n1, n2
                 add_edge_nonexists(g, n1, n2)
                 #print 'a 2 e', n1, n2
-            debug("ExpandContract: adding, c1, Ext. %s, %s", n1, sorted(self.ext_2_edges[n1]))
+            #debug("ExpandContract: adding, c2, Ext. %s, %s", self.c_id_1, sorted(self.ext_2_edges[n1]))
             for n2 in self.ext_2_edges[n1]:
                 if n2 in c2:
                 #if n2 > n1:
@@ -384,9 +417,21 @@ class ExpandContract(object):
             #for n2 in self.ext_1_edges[n1]:
             #    if n1 > n2:
             #        add_edge_nonexists(g, n1, n2)
-            debug("ExpandContract: adding, c1, Ext. %s, %s", n1, sorted(self.int_2_edges[n1]))
+            #debug("ExpandContract: adding, c1=%s, Ext. %s, %s", self.c_id_1, n1, sorted(self.int_2_edges[n1]))
             for n2 in self.int_2_edges[n1]:
                 add_edge_nonexists(g, n1, n2)
+        # check connectedness (we should never get to this point,
+        # should be checked above.  Left for sanity checking, comment
+        # this out later).
+        if len(nx.connected_components(g.subgraph(self.order[0:c1size]))) != 1:
+            ccs = nx.connected_components(g.subgraph(self.order[0:c1size]))
+            raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n1=%s, c1=%s, nodes=%s, order=%s, ccs=%s)"%(
+                self.p_in, c1size, self.c_id_1, self.order[0:c1size], self.order, ccs))
+        if len(nx.connected_components(g.subgraph(self.order[c1size:len(self.order)]))) != 1:
+            ccs = nx.connected_components(g.subgraph(self.order[c1size:len(self.order)]))
+            raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n2=%s, c2=%s, nodes=%s, order=%s, ccs=%s)"%(
+                self.p_in, len(self.order)-c1size, self.c_id_2, self.order[c1size:len(self.order)], self.order, ccs))
+
 
 
 re_k = re.compile('k= *([0-9.]+) *')
