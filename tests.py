@@ -132,6 +132,23 @@ class _TestRandom(unittest.TestCase):
         assert_distribution(lambda: getM().t(25).number_of_edges(),
                             128*127/2 * .6, std=None, p=.01)
 
+    def test_random_k(self):
+        """Test that specification of k= works in random cases."""
+        def getM():
+            return bm.get_model(self.model_name, p_in='k=10', p_out='k=10')
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            128*(10*4) * .5, std=None, p=.01)
+
+        def getM():
+            return bm.get_model(self.model_name, p_in='k=15', p_out='k=15')
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            (128*(15*4)) * .5, std=None, p=.01)
+
+        # cli
+        def getM():
+            return bm.main_argv(['BINNAME', self.model_name, '--k_in=13', '--k_out=13'])[0]
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            (128*(13*4)) * .5, std=None, p=.01)
 
     def test_ccs(self):
         M = bm.get_model(self.model_name, p_in=.5, p_out=0)
@@ -255,6 +272,13 @@ class TestMerge(_TestRandom):
         #tmpdir = tempfile.mkdtemp(prefix='dynbench-')
         #try:
 
+    def test_k(self):
+        """Test that specification of k= works in specific cases."""
+        def getM():
+            return bm.get_model(self.model_name, p_in='k=10', p_out='k=5')
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            (64*(10)+64*(5*3) + 64*(10*2)+64*(5*2) ) * .5, std=None, p=.01)
+
 
 class TestGrow(_TestRandom):
     model_name = 'StdGrow'
@@ -263,6 +287,15 @@ class TestGrow(_TestRandom):
         g = M.t(0);   assert_compnents(g, 4)
         g = M.t(50);  assert_compnents(g, 4)
         g = M.t(25);  assert_compnents(g, 4)
+    def test_k(self):
+        """Test that specification of k= works in specific cases."""
+        def getM():
+            return bm.get_model(self.model_name, p_in='k=10', p_out='k=5')
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            (128*(10)+128*(5*3) ) * .5, std=None, p=.01)
+        p_in = 10./31 ; p_out=5./32
+        assert_distribution(lambda: getM().t(25).number_of_edges(),
+                            (p_in*48*47 * 2  + p_in*16*15 * 2  + p_out*64*64*2 + p_out*16*48*2*2 ) * .5, std=None, p=.01)
 class TestMixed(_TestRandom):
     model_name = 'StdMixed'
     def test_ccs(self):

@@ -1,6 +1,7 @@
 import contextlib
 import math
 import random
+import re
 import sys
 import threading
 import time
@@ -388,11 +389,29 @@ class ExpandContract(object):
                 add_edge_nonexists(g, n1, n2)
 
 
-class StdMerge(Benchmark):
+re_k = re.compile('k= *([0-9.]+) *')
+class _StdBase(Benchmark):
     def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100,
                  opts={}):
         self.rng = random.Random(opts.get('seed', None))
         self.opts = opts
+
+        if isinstance(p_in, str) and re_k.match(p_in):
+            p_in  = float(re_k.match(p_in).group(1)) / (n-1)
+        if isinstance(p_out, str) and re_k.match(p_out):
+            p_out = float(re_k.match(p_out).group(1)) / n
+        self.p_in = p_in
+        self.p_out = p_out
+
+
+
+class StdMerge(_StdBase):
+    def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100,
+                 opts={}):
+        super(StdMerge, self).__init__(p_in=p_in, p_out=p_out, n=n, q=q,
+                                       tau=tau, opts=opts)
+        p_in = self.p_in
+        p_out = self.p_out
 
         if q%2 != 0:
             raise ValueError("q must be a multiple of two (given: q=%s)"%q)
@@ -423,11 +442,13 @@ class StdMerge(Benchmark):
             for n in c:
                 g.add_node(n)
 
-class StdGrow(Benchmark):
+class StdGrow(_StdBase):
     def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100,
                  opts={}):
-        self.rng = random.Random(opts.get('seed', None))
-        self.opts = opts
+        super(StdGrow, self).__init__(p_in=p_in, p_out=p_out, n=n, q=q,
+                                       tau=tau, opts=opts)
+        p_in = self.p_in
+        p_out = self.p_out
 
         if q%2 != 0:
             raise ValueError("q must be a multiple of two (given: q=%s)"%q)
@@ -457,11 +478,13 @@ class StdGrow(Benchmark):
             for n in c:
                 g.add_node(n)
 
-class StdMixed(Benchmark):
+class StdMixed(_StdBase):
     def __init__(self, p_in=1, p_out=0, n=32, q=4, tau=100,
                  opts={}):
-        self.rng = random.Random(opts.get('seed', None))
-        self.opts = opts
+        super(StdMixed, self).__init__(p_in=p_in, p_out=p_out, n=n, q=q,
+                                       tau=tau, opts=opts)
+        p_in = self.p_in
+        p_out = self.p_out
 
         if q%4 != 0:
             raise ValueError("q must be a multiple of four (given: q=%s)"%q)
@@ -514,8 +537,8 @@ def main_argv(argv=sys.argv):
     parser.add_argument("--n", help="", type=int)
     parser.add_argument("--p_in", help="Internal edge density", type=float)
     parser.add_argument("--p_out", help="External edge density",type=float)
-    parser.add_argument("--k_in",  type=int)
-    parser.add_argument("--k_out", type=int)
+    parser.add_argument("--k_in",  type=float)
+    parser.add_argument("--k_out", type=float)
     parser.add_argument("--tau",   type=int)
     parser.add_argument("--graph-format", default='edgelist', help="How to write graph, choices='edgelist', 'pajek'.")
     parser.add_argument("--comm-format", default='bynode', help="How to write communities, choices='oneline', 'bynode', 'pajek'.")
@@ -533,9 +556,9 @@ def main_argv(argv=sys.argv):
                         if getattr(args, name) is not None)
     print model_params
     if args.k_in is not None:
-        model_params['p_in']  = args.k_in  / float(args.n - 1)
+        model_params['p_in']  = 'k=%f'%args.k_in
     if args.k_out is not None:
-        model_params['p_out'] = args.k_out / float(args.n)
+        model_params['p_out'] = 'k=%f'%args.k_out
 
     return (get_model(args.bm_model, opts=args.__dict__, **model_params),
             args)
