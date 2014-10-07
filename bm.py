@@ -187,7 +187,7 @@ class Static(object):
 
 class Merging(object):
     def __init__(self, bm, c1, c2, p_low, p_high, tau, phasefactor=0.,
-                 c_id_1=0, c_id_2=1):
+                 c_id_1=0, c_id_2=1, c_id_merged=2):
         self.bm = bm
         self.n_links = n_links = len(c1) * len(c2)
         debug("Merging, meanlinks_low=%s, meanlinks_high=%s", p_low*n_links, p_high*n_links)
@@ -195,6 +195,7 @@ class Merging(object):
         self.c2 = c2
         self.c_id_1 = c_id_1
         self.c_id_2 = c_id_2
+        self.c_id_merged = c_id_merged
 
         self.p_low = p_low
         self.p_high = p_high
@@ -260,7 +261,7 @@ class Merging(object):
                         self.c_id_2: self.c2}
         # What is the proper form of this?  We shouldn't reuse c_id_1
         # since it is now a different community.
-        return {self.c_id_1: set.union(self.c1, self.c2)}
+        return {self.c_id_merged: set.union(self.c1, self.c2)}
 
 
 
@@ -473,7 +474,7 @@ class StdMerge(_StdBase):
                 Merging(self, cs[c0], cs[c1],
                         p_high=p_in, p_low=p_out, tau=tau,
                         phasefactor=i/float(q//2),
-                        c_id_1=c0, c_id_2=c1))
+                        c_id_1=c0, c_id_2=c1, c_id_merged=q+i))
             managers.append(Static(self, cs[c0], p=p_in))
             managers.append(Static(self, cs[c1], p=p_in))
             for j in range(i+1, q//2):
@@ -545,7 +546,7 @@ class StdMixed(_StdBase):
                 Merging(self, cs[c0], cs[c1],
                         p_high=p_in, p_low=p_out, tau=tau,
                         phasefactor=i/float(q//4),
-                        c_id_1=c0, c_id_2=c1))
+                        c_id_1=c0, c_id_2=c1, c_id_merged=q+i))
             managers.append(Static(self, cs[c0], p=p_in))
             managers.append(Static(self, cs[c1], p=p_in))
             managers.append(
@@ -662,7 +663,7 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
                 f = open(prefix+'.comms', 'w')
                 label = 't=%s, command line: %s'%(t, ' '.join(sys.argv))
                 comm_writer(f, comms, label)
-        print t, len(g), g.number_of_edges(), len(comms)
+        print t, len(g), g.number_of_edges(), len(comms), sorted(comms.keys())
 
 
 def write_comms_oneline(f, comms, label=None):
