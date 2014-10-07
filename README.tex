@@ -18,7 +18,24 @@ This document describes the implementation of the dynamic network
 community benchmark.
 
 
-\section{Principles}
+\section{Basic usage}
+
+\subsection{Sample usage}
+
+\begin{itemize}
+\item \texttt{./bm.py StdMerge output-prefix}
+\item \texttt{./bm.py StdGrow output-prefix}
+\item \texttt{./bm.py StdMixed output-prefix}
+\item \texttt{./bm.py StdMerge output-prefix --n=32 --q=16 --p\_in=.5 --p\_out=.1}
+\item \texttt{./bm.py StdMerge output-prefix --k\_in=16 --k\_out=3}
+\item Specifying with k\_in instead of p\_in will automatically
+  calculate $p$s on a PER COMMUNITY basis.  Total external edges are $k_\out(q-1)$.
+\end{itemize}
+
+
+\section{Technical notes}
+
+\subsection{Principles}
 \label{sec:principles}
 
 \begin{itemize}
@@ -65,7 +82,7 @@ community benchmark.
 
 
 
-\section{Static mechanism}
+\subsection{Static mechanism}
 \begin{itemize}
 \item A community $A$ has $n$ nodes.
 \item Each edge within $A$ (between two nodes in $A$, excluding
@@ -82,7 +99,7 @@ community benchmark.
 
 
 
-\section{Merging mechanism}
+\subsection{Merging mechanism}
 
 \begin{itemize}
 \item Two communities, $A$ and $B$, are initialized with $n$ nodes.
@@ -130,7 +147,7 @@ community benchmark.
 
 
 
-\section{Expansion/contraction mechanism.}
+\subsection{Expansion/contraction mechanism.}
 \begin{itemize}
 \item Two communities, $A$ and $B$, have $n$ nodes.  A fraction $f$
   defines the fraction of each community that is moved to the other
@@ -161,7 +178,7 @@ community benchmark.
 
 
 
-\section{Standard benchmarks}
+\subsection{Standard benchmarks}
 
 \textbf{This section is written poorly and unfinished.  I should
   describe how different $q$ works and make this more rigorous.}
@@ -182,19 +199,6 @@ Four communities.  0 and 1 ``merging'', 2 and 3 ``growing'' with phase
 factors of 0 and 0.  All other links between \{0,1\} and \{2,3\} are
 managed by ``static'' with edge density $\pout$.
 
-
-
-\section{Sample usage}
-
-\begin{itemize}
-\item \texttt{./bm.py StdMerge output-prefix}
-\item \texttt{./bm.py StdGrow output-prefix}
-\item \texttt{./bm.py StdMixed output-prefix}
-\item \texttt{./bm.py StdMerge output-prefix --n=32 --q=16 --p\_in=.5 --p\_out=.1}
-\item \texttt{./bm.py StdMerge output-prefix --k\_in=16 --k\_out=3}
-\item Specifying with k\_in instead of p\_in will automatically
-  calculate $p$s on a PER COMMUNITY basis.  Total external edges are $k_\out(q-1)$.
-\end{itemize}
 
 
 
