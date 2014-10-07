@@ -283,6 +283,14 @@ class TestMerge(_TestRandom):
                             (64*(10)+64*(5*3) + 64*(10*2)+64*(5*2) ) * .5, std=None, p=.01)
 
 
+    def test_Gnm(self):
+        M = bm.get_model(self.model_name, p_in=.5, p_out=.5,
+                         opts=dict(Gnm=True))
+        edges = M.t(0).number_of_edges()
+        expected_edges = 128*127 / 2 * .5
+        assert_almost_equals(edges, expected_edges, delta=5)
+
+
 class TestGrow(_TestRandom):
     model_name = 'StdGrow'
     def test_ccs(self):

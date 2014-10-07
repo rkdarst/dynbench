@@ -156,8 +156,13 @@ class Static(object):
             n_links = len(c1) * len(c2)
         debug("Static, meanlinks=%s, n_links=%s, p=%s", p*n_links, n_links, p)
         # Number of actual edges
-        with override_numpy_seed(self.bm.rng):
-            n_edges = scipy.stats.binom(n_links, p).rvs()
+        if not self.bm.opts.get('Gnm', True):
+            # Gnp random graph ensemble
+            with override_numpy_seed(self.bm.rng):
+                n_edges = scipy.stats.binom(n_links, p).rvs()
+        else:
+            # Gnm random graph ensemble
+            n_edges = int(round(n_links * p ))
 
         self.edges_active = choose_random_edges(c1=c1, c2=c2, m=n_edges,
                                            rng=self.bm.rng)
@@ -199,9 +204,16 @@ class Merging(object):
 
         self.p_low = p_low
         self.p_high = p_high
-        with override_numpy_seed(self.bm.rng):
-            self.m_low  = scipy.stats.binom(n_links, p_low ).rvs()
-            self.m_high = scipy.stats.binom(n_links, p_high).rvs()
+        if not self.bm.opts.get('Gnm', True):
+            # Gnp random graph ensemble
+            with override_numpy_seed(self.bm.rng):
+                self.m_low  = scipy.stats.binom(n_links, p_low ).rvs()
+                self.m_high = scipy.stats.binom(n_links, p_high).rvs()
+        else:
+            # Gnm random graph ensemble
+            self.m_low  = int(round(n_links * p_low))
+            self.m_high = int(round(n_links * p_high))
+
         debug("Merging, links_low=%s, links_high=%s, p_low=%s, p_high=%s",
               self.m_low, self.m_high, p_low, p_high)
         self.tau = tau
@@ -594,6 +606,8 @@ def main_argv(argv=sys.argv):
     parser.add_argument("--seed",  default=None, help="Random seed")
     parser.add_argument("--no-det-limit",  action='store_true',
                         help="No detectability limit")
+    parser.add_argument("--Gnm",  action='store_true',
+                        help="Use Gnm random graph ensemble instead of Gnp.  Only works for merging, not grow/shrink.")
     model_params_names = ['q', 'n', 'p_in', 'p_out', 'tau', ]
 
     print argv
