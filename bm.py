@@ -156,7 +156,7 @@ class Static(object):
             n_links = len(c1) * len(c2)
         debug("Static, meanlinks=%s, n_links=%s, p=%s", p*n_links, n_links, p)
         # Number of actual edges
-        if not self.bm.opts.get('Gnm', True):
+        if not self.bm.opts.get('Gnm', False):
             # Gnp random graph ensemble
             with override_numpy_seed(self.bm.rng):
                 n_edges = scipy.stats.binom(n_links, p).rvs()
@@ -204,7 +204,7 @@ class Merging(object):
 
         self.p_low = p_low
         self.p_high = p_high
-        if not self.bm.opts.get('Gnm', True):
+        if not self.bm.opts.get('Gnm', False):
             # Gnp random graph ensemble
             with override_numpy_seed(self.bm.rng):
                 self.m_low  = scipy.stats.binom(n_links, p_low ).rvs()
