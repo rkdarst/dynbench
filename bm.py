@@ -67,11 +67,12 @@ class Benchmark(object):
             for n in c:
                 g.add_node(n)
 
-    def t(self, t):
+    def graph(self, t):
         g = self.g.copy()
         for mgr in self.managers:
             mgr.t(g, t)
         return g
+    t = graph
     def comms(self, t):
         comms = { }
         for mrg in self.managers:
