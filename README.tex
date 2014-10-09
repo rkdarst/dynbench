@@ -2,25 +2,228 @@
 
 \def\pin{p_\mathrm{in}}
 \def\pout{p_\mathrm{out}}
+\def\kin{k_\mathrm{in}}
+\def\kout{k_\mathrm{out}}
 \def\in{\mathrm{in}}
 \def\out{\mathrm{out}}
 \def\low{\mathrm{low}}
 \def\high{\mathrm{high}}
 
+\def\code#1{\texttt{#1}}
 
 \title{Dynamic community detection benchmark readme}
+
+
+
+
 
 \begin{document}
 
 \maketitle
 
-This document describes the implementation of the dynamic network
+This document describes the usage and implementation of the dynamic network
 community benchmark.
 
 
-\section{Basic usage}
 
-\subsection{Sample usage}
+
+
+\section{About the benchmark}
+\label{sec:about}
+
+The benchmark is fully described in our accompanying paper \cite{xxx}.
+
+\vspace{.5cm}
+
+\noindent
+There are two basic operations:
+
+\textbf{Merging/splitting}: Two communities start off as random graphs
+with link density $\pin$, with link density $\pout$ between them.  As
+time goes on, edges are added between them until there becomes a
+random graph with only one community of link density $\pin$.  Then,
+this process reverses to complete one cycle until the communities are
+split again.
+
+\textbf{Expanding/contracting}: Two equal sized communities start off
+as random graphs with internal link densities $\pin$.  Nodes are
+transferred from one community to the other, until the fraction $f$ of
+the nodes of one community have been moved.  At $t=.25\tau$, we have
+the maximal size of the first community and minimal size of the
+second.  The process reverses, and at $t=.5\tau$ communities are of
+equal size again, and at $t=.75\tau$ the second community is at the
+maximal size.  Then, at $t=\tau$ the communities return to equal size,
+one cycle is complete, and the process repeats.  At all times, the
+internal link density of both communities is maintained at $\pin$ and
+link density between them is maintained at $\pout$.
+
+\vspace{.5cm}
+
+\noindent
+These two unit operations are combined into three basic benchmarks.
+This is only a summary of the mechanism, for full details see section
+\ref{sec:technical}:
+
+\textbf{StdMerge}: There are $q=4$ equal size ($n=32$ nodes)
+communities.  The ``top'' two communities start out split, merge, and
+re-split over one cycle.  The ``bottom'' starts off as one community,
+splits, and re-merges over the cycle (.5 phase difference).  Internal
+link density is $\pin$, split link density is $\pout$, and all other
+link densities are $\pout$.  The cycle time is $\tau=100$.
+
+\textbf{StdGrow}: There are $q=4$ equal size ($n=32$ nodes)
+communities.  The ``top'' communities begin as two equal size
+communities and the expand/contract process occurs.  The ``bottom''
+two communities begin as equal size communities and the
+expand/contract process occurs with a .5 phase difference (however,
+it is actually symmetric so the phase factor does nothing).  The other
+variables $\pin$, $\pout$, and $\tau$, are as in StdGrow.
+
+\textbf{StdMerge}: There are $q=4$ communities.  The ``top'' two begin
+split and follow the merging process, and the ``bottom'' two follow
+the expand/contract process.  The other variables $\pin$, $\pout$, and
+$\tau$ are as in StdGrow.
+
+
+
+
+
+\section{Installation}
+
+
+\begin{itemize}
+\item Only dependencies are Python 2.x and the graph library
+  \texttt{networkx}.  \texttt{networkx} is distributed with this code
+  and should not need separate installation.
+\item This code should be runnable from its directory and does not
+  need installation.
+\item To load the code as a library, place \texttt{bm} on your Python
+  path or the directory from which your other code runs.  If you want
+  to do this, you probably already know what to do.
+\end{itemize}
+
+
+
+
+
+\section{Usage}
+
+The code can be used as a normal program from the command line
+(section \ref{sec:use-cli}), as a module for other Python programs
+(section \ref{sec:use-library}), or can be extended by subclassing to
+create your own custom tests (section \ref{sec:use-newtests}).
+
+
+
+
+\subsection{Command line usage}
+\label{sec:use-cli}
+
+Execute the \code{bm.py}.  To get a listing of help options, run:
+
+\begin{verbatim}
+python /path/to/bm.py -h
+\end{verbatim}
+
+Standard syntax:
+\begin{verbatim}
+bm.py ModelName OutputPrefix [options]
+\end{verbatim}
+You must provide a \texttt{ModelName}, and a \texttt{OutputPrefix} to
+specify where files will be written.
+
+Output is written into \texttt{*.graph} files which contain the graphs
+at times (in your desired format, by default edgelists), and
+\texttt{*.comms} files which contain instantaneous community
+information.  Output formats can be specified by \code{--graph-format}
+or \code{--comm-format}.
+
+The options \code{--p\_in}, \code{--p\_out}, \code{--n}, and \code{--q}
+can control the most important other parameters.
+
+\vspace{.5cm}
+
+\noindent
+Required positional arguments:
+
+\begin{description}
+\item[ModelName] Model name to simulate.  Can be \texttt{StdMerge},
+  \texttt{StdGrow}, or \texttt{StdMixed}.  These are described
+  in section \ref{sec:about}.
+\item[OutputPrefix] Where to write output.  Technically, this is
+  optional, if not specified no output will be written and you will
+  only see some information as things are calculated.
+  \texttt{OutputPrefix} can contain directory names.  Files will be
+  written to \texttt{\textsl{OutputPrefix}.tNNNNN.*}, where \texttt{NNNNN} is
+  the corresponding time step.
+\end{description}
+
+
+\vspace{.5cm}
+
+\noindent
+Commonly used options:
+
+\begin{description}
+\item[-{}-n=INTEGER] Number of nodes in each community.  The total
+  number of nodes is $n\times q$.  (library model option: \code{n=INT})
+\item[-{}-q=INTEGER] Number of total communities, default 4.  This
+  should be a multiple of 2 for \texttt{StdMerge} and
+  \texttt{StdGrow}, and a multiple of 4 for \texttt{StdMixed}.
+  (library model option: \code{q=INT})
+\item[-{}-p\_in=REAL] Set the link density within communities.  Every
+  pair of nodes in the same community will independently have this
+  probability of having an edge.  Must be real number between 0.0 and
+  1.0.  (library model option: \code{p\_in=FLOAT})
+\item[-{}-p\_out=REAL] Set the link density between nodes in different
+  communities.  Analogous to \code{--p\_in}.  (library model option:
+  \code{p\_out=FLOAT})
+\item[-{}-k\_in=REAL] An alternative method of setting $\pin$.  This
+  effectively sets $\pin$ = $\kin/(n-1)$.  The meaning of $\kin$ is
+  not well defined for the growing/shrinking benchmark, see below for
+  more information.  FIXME:describe this. (library option: use
+  \code{p\_in="k=FLOAT"})
+\item[-{}-k\_out=REAL] An alternative method of setting $\pout$.  This
+  effectively sets $\pout$ = $\kout/n$.  The meaning of $\kout$ is not
+  well defined for the growing/shrinking benchmark, see below for more
+  information.  FIXME:describe this. This is the number of external
+  edges \textsl{per community}, so the total number of external edges
+  is $\kout(q-1)$.  (library option: use \code{p\_out="k=FLOAT"})
+\end{description}
+
+\vspace{.5cm}
+
+\noindent
+Other options:
+
+\begin{description}
+\item[-{}-t=INT] Maximum time to simulate when running from the command
+  line.  Graphs and communities will be written for every integer time
+  between [0, T].  (library option: not applicable, you can directly
+  get any time point from the library.)
+\item[-{}-tau=REAL] Model time period.  The model repeats after this
+  time.  The graph and communities at points $t$ and $t+\tau$ are
+  identical.  (library option: \code{tau=FLOAT})
+\item [-{}-graph-format=NAME] Output format for graph writing.  Options
+  include \texttt{edgelist} (the default), \texttt{pajek},
+  \texttt{null}, or any \texttt{networkx} \texttt{write\_*} function
+  suffix (such as \texttt{gml} or \texttt{gexf}).  (library option: not
+  applicable)
+\item [-{}-comm-format=NAME] Output format for community writing.  Options
+  are \texttt{oneline} (the default), \texttt{bynode}, \texttt{pajek},
+  or \texttt{null}.  (library option: not applicable)
+\item [-{}-seed=STRING] Seed for the random number generator, passed
+  directly to Python's \code{random.Random.seed}.  (library
+  option: \texttt{opts=\{"seed": SEED\}})
+\item [-{}-no-det-limit] Seed for the random number generator.  (library
+  option: \texttt{opts=\{"no\_det\_limit": True\}})
+\item [-{}-Gnm] (library
+  option: \texttt{opts=\{"Gnm": True\}})
+\end{description}
+
+
+
+\subsubsection{Examples}
 
 \begin{itemize}
 \item \texttt{./bm.py StdMerge output-prefix}
@@ -33,7 +236,115 @@ community benchmark.
 \end{itemize}
 
 
+
+\subsection{Usage as a library}
+\label{sec:use-library}
+
+
+The main module \texttt{bm} can be imported as a Python module.  Then,
+graphs and communities can be directly accessed at each individual
+time step, without a need for creating and reading many temporary
+files.
+
+The easiest entry point is the \texttt{get\_model} function.  All
+options from the command line (that are applicable here) can also be
+specified through the library interface.  The meaning of these options
+are not explained again here, for reference see the previous section
+on command line usage.
+
+\begin{description}
+\item[bm.get\_model]\hspace{-.15cm}(\textsl{ModelName}, **\textsl{model-opts}, opts={})
+
+  Return a benchmark object \code{M}.
+
+  The following keyword options are accepted: \code{p\_in}, \code{p\_out},
+  \code{n}, \code{q}, \code{tau}, \code{opts}.  Of these, \code{opts}
+  can be a dictionary which contains other options.
+
+  To specify a \code{k\_in}, use \code{p\_in="k=K"}, that is, the
+  \code{p\_in} option is a string starting with \code{"k="} followed
+  by the average degree desired.  Then, $\pin=\kin/(n-1)$ and
+  $\pout=\kout/n$ are calculated and used.
+
+  Example usage: \code{bm.get\_model("StdMerge", p\_in=.5, p\_out=.1,
+    n=100, q=8, opts=\{"no\_det\_limit": True\})}
+
+\item[Benchmark object] Object representing model state and
+  configurations.
+
+  \begin{description}
+  \item [Benchmark.graph]\hspace{-.15cm}(t)
+
+    Return \code{networkx} graph object corresponding to network state
+    at time $t$.
+
+  \item [Benchmark.comms]\hspace{-.15cm}(t)
+
+    Return the communities of the network at time $t$.  This is a
+    dictionary with keys representing community names (currently integers, but
+    can be generalized to any string) and values which are
+    \texttt{set}s of node IDs.
+  \end{description}
+
+
+\item[bm.main\_argv]\hspace{-.15cm}(argv)
+
+  Emulate command line usage from script.  The argument \texttt{argv}
+  should be a list of strings of command line options to emulate.  The
+  first element of the list should be some placeholder for the script name.
+
+  This does \textsl{not} run or write any output, only returns a Model
+  object.  The \code{bm.run} function handles running and writing.
+  Here, you would use the \code{graph} and \code{comms} method to get
+  exactly the times you want without temporary files.
+
+  Example: \code{bm.main\_argv(["X", "StdGrow", "--p\_in=.1"])}
+
+  Returns: tuple \texttt{(Benchmark \textrm{object}, args)}
+
+\end{description}
+
+
+
+
+\subsection{Creating your own benchmarks}
+\label{sec:use-newtests}
+
+The benchmark includes three standard models: \texttt{StdMerge},
+\texttt{StdGrow}, and \texttt{StdMixed}.  These are made of three
+basic operations in the classes: \texttt{Static}, statically placing links,
+\texttt{Merging}, making merging operation that occurs over time, and
+\texttt{ExpandContract} which make two communities that expand/contract
+in time.  These three unit operations can be combined in order to make
+your own benchmarks, for example, with different time scales or
+different community sizes.
+
+\textsl{This is not documented yet.}
+
+
+
+
+\section{Usage notes}
+\label{sec:usage-notes}
+
+\subsection{Disconnected communities}
+
+\subsection{$\kin$ and $\kout$}
+
+\subsection{Output formats}
+
+
+\subsection{Community tracking information}
+
+\subsection{Time-reversibility}
+
+\subsection{Threadsafety}
+
+
+
+
 \section{Technical notes}
+\label{sec:technical}
 
 \subsection{Principles}
 \label{sec:principles}
@@ -183,18 +494,18 @@ community benchmark.
 \textbf{This section is written poorly and unfinished.  I should
   describe how different $q$ works and make this more rigorous.}
 
-\subsection{Standard - Merging}
+\subsubsection{Standard - Merging}
 Four communities.  0 and 1 merging, 2 and 3 merging with phase
 factors of 0 and .5.  Internal nodes are with ``static'' mechanism with
 edge density $\pin$.  All other links between \{0,1\} and \{2,3\} are
 managed by ``static'' with edge density $\pout$.
 
-\subsection{Standard - Merging}
+\subsubsection{Standard - Merging}
 Four communities.  0 and 1 ``growing'', 2 and 3 ``growing'' with phase
 factors of 0 and .5.  All other links between \{0,1\} and \{2,3\} are
 managed by ``static'' with edge density $\pout$.
 
-\subsection{Standard - Mixed}
+\subsubsection{Standard - Mixed}
 Four communities.  0 and 1 ``merging'', 2 and 3 ``growing'' with phase
 factors of 0 and 0.  All other links between \{0,1\} and \{2,3\} are
 managed by ``static'' with edge density $\pout$.
