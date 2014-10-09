@@ -81,6 +81,15 @@ class Benchmark(object):
                     raise ValueError("Duplicate community name: %s"%cname)
                 comms[cname] = cnodes
         return comms
+    def grammar(self):
+        """List of dynamic community grammar statements for last t
+        """
+        grammar = [ ]
+        for mgr in self.managers:
+            for stmt in getattr(mgr, '_grammar', [ ]):
+                grammar.append(stmt)
+        return grammar
+
 
 
 def shuffled(rng, x):
@@ -202,6 +211,7 @@ class Merging(object):
         self.c_id_1 = c_id_1
         self.c_id_2 = c_id_2
         self.c_id_merged = c_id_merged
+        self._old_ids = { }
 
         self.p_low = p_low
         self.p_high = p_high
@@ -262,19 +272,74 @@ class Merging(object):
         for a,b in edges:
             add_edge_nonexists(g, a, b)
     def comms(self, t):
+        # Find if we are merged or not
+        is_merged = True
         if self.bm.opts.get('no_det_limit', False):
             x = self.x_at_t(t)
             if x < 1:
-                return {self.c_id_1: self.c1,
-                        self.c_id_2: self.c2}
+                is_merged = False
         else:
             p = self.p_at_t(t)
             if p < self.p_limit:
-                return {self.c_id_1: self.c1,
-                        self.c_id_2: self.c2}
+                is_merged = False
         # What is the proper form of this?  We shouldn't reuse c_id_1
         # since it is now a different community.
-        return {self.c_id_merged: set.union(self.c1, self.c2)}
+
+        cids_old = self._old_ids
+        if is_merged:
+            # Get new CIDs
+            if self.bm.opts.get('cids') == 'snapshot':
+                cMid = self.bm.get_next_cid()
+            elif self.bm.opts.get('cids') == 'new':
+                if len(self._old_ids) == 1:
+                    cMid = self._old_ids['merged']
+                else:
+                    cMid = self.bm.get_next_cid()
+            else:
+                cMid = self.c_id_merged
+            # Compute what our new dyngrammar statement is
+            if cids_old and len(self._old_ids) == 2:
+                self._grammar = [('Merge', tuple(cids_old.values()), (cMid,))
+                                 ]
+            elif cids_old and cids_old['merged'] != cMid:
+                self._grammar = [('Continue', cids_old['merged'], cMid)]
+            else:
+                self._grammar = [ ]
+            # Record old IDs
+            self._old_ids = dict(merged=cMid)
+            # Return values
+            return {cMid: set.union(self.c1, self.c2)}
+        else:  # not merged
+            # Get new CIDs
+            if self.bm.opts.get('cids') == 'snapshot':
+                c1id = self.bm.get_next_cid()
+                c2id = self.bm.get_next_cid()
+            elif self.bm.opts.get('cids') == 'new':
+                if len(self._old_ids) == 2:
+                    c1id = self._old_ids['left']
+                    c2id = self._old_ids['right']
+                else:
+                    c1id = self.bm.get_next_cid()
+                    c2id = self.bm.get_next_cid()
+            else:
+                c1id = self.c_id_1
+                c2id = self.c_id_2
+            # Compute what our new dyngrammar statement is
+            if len(self._old_ids) == 1:
+                self._grammar = [('Split', (cids_old['merged'],), (c1id,c2id))]
+            elif (cids_old
+                  and (c1id, c2id) != (cids_old['left'], cids_old['right'])):
+                self._grammar = [('Continue', cids_old['left'],  c1id),
+                                 ('Continue', cids_old['right'], c2id),
+                                 ]
+            else:
+                self._grammar = [ ]
+            # Record old IDs
+            self._old_ids = dict(left=c1id, right=c2id)
+            # Return values
+            return {c1id: self.c1,
+                    c2id: self.c2}
+
 
 
 
@@ -292,6 +357,7 @@ class ExpandContract(object):
         self.phasefactor = phasefactor
         self.c_id_1 = c_id_1
         self.c_id_2 = c_id_2
+        self._old_ids = { }
 
         self.order1 = order1 = sorted(shuffled(self.bm.rng, c1))
         self.order2 = order2 = sorted(shuffled(self.bm.rng, c2))
@@ -401,8 +467,27 @@ class ExpandContract(object):
         return c1
     def comms(self, t):
         c1 = self.c1_size_at_t(t)
-        return {self.c_id_1: self.order[:c1],
-                self.c_id_2: self.order[c1:]}
+        # Figure new cids
+        if self.bm.opts.get('cids') == 'snapshot':
+            c1id = self.bm.get_next_cid()
+            c2id = self.bm.get_next_cid()
+        else:
+            c1id = self.c_id_1
+            c2id = self.c_id_2
+        # Comupte new dyngrammer statement
+        if c1 == 0 or c1 == len(self.order):
+            raise NotImplementedError("ExpandContract does not yet produce "
+                   "proper grammar for the case where one community "
+                   "completly vanishes.")
+        if self._old_ids and (self._old_ids['left'] != c1id
+                              or self._old_ids['right'] != c2id):
+            self._grammar = [('Continue', self._old_ids['left'],  c1id),
+                             ('Continue', self._old_ids['right'], c2id)]
+        # Save old IDs
+        self._old_ids = {'left': c1id, 'right': c2id }
+        # Return communities
+        return {c1id: self.order[:c1],
+                c2id: self.order[c1:]}
 
     def t(self, g, t):
         c1size = self.c1_size_at_t(t)
@@ -457,6 +542,8 @@ class _StdBase(Benchmark):
         self.rng = random.Random(opts.get('seed', None))
         self.opts = opts
 
+        self._next_cid = 0
+
         if isinstance(p_in, str) and re_k.match(p_in):
             p_in  = float(re_k.match(p_in).group(1)) / (n-1)
         if isinstance(p_out, str) and re_k.match(p_out):
@@ -464,6 +551,17 @@ class _StdBase(Benchmark):
         self.p_in = p_in
         self.p_out = p_out
 
+    def get_next_cid(self):
+        """Get next (new) community ID.
+
+        When community IDs are not being reused, we need a way to get
+        the next available new ID.  This function does that, storing
+        state on the benchmark.  Each call will return a new
+        increasing integer.
+        """
+        cid = self._next_cid
+        self._next_cid += 1
+        return cid
 
 
 class StdMerge(_StdBase):
@@ -609,6 +707,10 @@ def main_argv(argv=sys.argv):
                         help="No detectability limit")
     parser.add_argument("--Gnm",  action='store_true',
                         help="Use Gnm random graph ensemble instead of Gnp.  Only works for merging, not grow/shrink.")
+    parser.add_argument("--cids",
+                        help="Community ID reuse scheme.")
+
+
     model_params_names = ['q', 'n', 'p_in', 'p_out', 'tau', ]
 
     print argv
@@ -648,6 +750,9 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
     for t in range(maxt+1):
         g = bm.t(t)
         comms = bm.comms(t)
+        grammar = bm.grammar()
+        for stmt in grammar:
+            print '   ', stmt
         if output:
             prefix = output + '.t%05d'%t
             # write graph
@@ -678,7 +783,8 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
                 f = open(prefix+'.comms', 'w')
                 label = 't=%s, command line: %s'%(t, ' '.join(sys.argv))
                 comm_writer(f, comms, label)
-        print t, len(g), g.number_of_edges(), len(comms), sorted(comms.keys())
+        print t, len(g), g.number_of_edges(), len(comms),sorted(comms.keys())
+              #dict((k, len(v)) for k,v in comms.iteritems())
 
 
 def write_comms_oneline(f, comms, label=None):
