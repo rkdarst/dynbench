@@ -90,6 +90,45 @@ class Benchmark(object):
                 grammar.append(stmt)
         return grammar
 
+    def write_temporal_edgelist(self, g, fname, t):
+        """Write temporal edgelist: (a, b, weight, time) pairs.
+        """
+        if not hasattr(self, '_temporal_edgelist_files'):
+            self._temporal_edgelist_files = { }
+        filedata = self._temporal_edgelist_files
+        if fname not in filedata:
+            print 'opening g'
+            f = filedata[fname] = open(fname, 'w')
+        else:
+            f = filedata[fname]
+        for a, b, data in g.edges_iter(data=True):
+            print >> f, a, b, data.get('weight', 1), t
+        f.flush()
+    def write_temporal_communities(self, fname, comms, t):
+        """Write temporal communities in matrix format.
+
+        Format is: each line is one timestep.  Communities are written
+        one per line in node sort order.  Overlaps, missing
+        communities, and time information is not written."""
+        if not hasattr(self, '_temporal_comms_files'):
+            self._temporal_comms_files = { }
+        filedata = self._temporal_comms_files
+        if fname not in filedata:
+            print 'opening c'
+            f = filedata[fname] = open(fname, 'w')
+        else:
+            f = filedata[fname]
+        # get node -> cmty map
+        nodecmtys = { }
+        for cname, cnodes in comms.iteritems():
+            for node in cnodes:
+                nodecmtys[node] = cname
+        memberships = [ ]
+        # Assemble list and write it
+        for n in sorted(nodecmtys):
+            memberships.append(nodecmtys[n])
+        print >> f, ' '.join(str(x) for x in memberships)
+        f.flush()
 
 
 def shuffled(rng, x):
@@ -764,6 +803,8 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
                 nx.write_pajek(g, prefix+'.graph')
             elif graph_format == 'null':
                 pass
+            elif graph_format == 'tedgelist':
+                bm.write_temporal_edgelist(g, output+'.tgraph', t)
             else:
                 try:
                     graphwriter = getattr(nx, 'write_'+graph_format)
@@ -775,6 +816,9 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
             elif comm_format == 'bynode': comm_writer = write_comms_bynode
             elif comm_format == 'pajek':  comm_writer = write_comms_pajek
             elif comm_format == 'null':   comm_writer = None
+            elif comm_format == 'tmatrix':
+                bm.write_temporal_communities(output+'.tcomms', comms, t)
+                comm_writer = None
             else:
                 raise ValueError("Unknown comm format: %s"%comm_format)
             # Delay opening the file until here, so we can skip it
