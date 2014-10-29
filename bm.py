@@ -129,6 +129,24 @@ class Benchmark(object):
             memberships.append(nodecmtys[n])
         print >> f, ' '.join(str(x) for x in memberships)
         f.flush()
+    def write_temporal_commlist(self, fname, comms, t):
+        """Write temporal communities in matrix format.
+
+        Format is: each line is one timestep.  Communities are written
+        one per line in node sort order.  Overlaps, missing
+        communities, and time information is not written."""
+        if not hasattr(self, '_temporal_commlist_files'):
+            self._temporal_commlist_files = { }
+        filedata = self._temporal_commlist_files
+        if fname not in filedata:
+            print 'opening c'
+            f = filedata[fname] = open(fname, 'w')
+        else:
+            f = filedata[fname]
+        for cname, cnodes in comms.iteritems():
+            for node in cnodes:
+                print >> f, t, node, cname
+        f.flush()
 
 
 def shuffled(rng, x):
@@ -818,6 +836,9 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
             elif comm_format == 'null':   comm_writer = None
             elif comm_format == 'tmatrix':
                 bm.write_temporal_communities(output+'.tcomms', comms, t)
+                comm_writer = None
+            elif comm_format == 'tcommlist':
+                bm.write_temporal_commlist(output+'.tcomms', comms, t)
                 comm_writer = None
             else:
                 raise ValueError("Unknown comm format: %s"%comm_format)
