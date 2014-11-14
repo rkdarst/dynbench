@@ -756,8 +756,8 @@ def main_argv(argv=sys.argv):
     parser.add_argument("--k_in",  type=float)
     parser.add_argument("--k_out", type=float)
     parser.add_argument("--tau",   type=int)
-    parser.add_argument("--graph-format", default='edgelist', help="How to write graph, choices='edgelist', 'pajek'.")
-    parser.add_argument("--comm-format", default='bynode', help="How to write communities, choices='oneline', 'bynode', 'pajek'.")
+    parser.add_argument("--graph-format", default='tedgelist', help="How to write graph, choices='edgelist', 'pajek'.")
+    parser.add_argument("--comm-format", default='tcommlist', help="How to write communities, choices='oneline', 'bynode', 'pajek'.")
     #parser.add_argument("--", help="", type=int, default=)
     parser.add_argument("--seed",  default=None, help="Random seed")
     parser.add_argument("--no-det-limit",  action='store_true',
@@ -852,6 +852,7 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
               #dict((k, len(v)) for k,v in comms.iteritems())
 
 
+
 def write_comms_oneline(f, comms, label=None):
     """Write communities, one line per community."""
     if label:
@@ -870,7 +871,6 @@ def write_comms_bynode(f, comms, label=None):
     for cname, cnodes in comms.iteritems():
         for node in cnodes:
             print >> f, node, cname
-
 def write_comms_pajek(f, comms, label=None):
     """Write communities, lines with 'node comm' pairs"""
     if label:
