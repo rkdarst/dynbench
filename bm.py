@@ -15,11 +15,23 @@ logger = logging.getLogger(__name__)
 debug = logger.debug
 info = logger.info
 
+
+# Exception which will be raised when a disconnected subgraph is made.
 class DisconnectedError(Exception):
     pass
 
+# Detectability limit
+def k_out_limit(kin, q):
+    """Detectability limit.
 
-def k_out_limit(kin, q): return kin-.5*( math.sqrt((q-1)**2+(4*q*kin)) - (q-1))
+    For a given k_in and q, return the k_out_limit.  If k_out is below
+    this point, the communities should be detectable.
+
+    Uses the infinite size approximations:
+      k_in = N*p_in
+      k_out = N*p_out
+    """
+    return kin-.5*( math.sqrt((q-1)**2+(4*q*kin)) - (q-1))
 
 
 _numpy_rng_lock = threading.Lock()
@@ -27,7 +39,14 @@ _numpy_rng_lock = threading.Lock()
 def override_numpy_seed(rng):
     """Temporarily override the numpy random number generator seed.
 
-    scipy.stats uses numpy.random without an interface to set the seed or random number generator state machine.  This is a problem, since we need seeding support.  One could just set numpy.random"""
+    scipy.stats uses numpy.random without an interface to set the seed
+    or random number generator state machine.  This is a problem,
+    since we need seeding support.  One could just set
+    numpy.random.seed, but then this program is not threadsafe.
+
+    This is a solution that locks the scipy RNG using a context
+    manager.  It may be a bit over-thought, but I would rather
+    maintain threadsafety."""
     with _numpy_rng_lock:
         # Ggt old state
         old_state = numpy.random.get_state()
@@ -43,6 +62,18 @@ def override_numpy_seed(rng):
 
 
 class Benchmark(object):
+    """Complete benchmark class.
+
+    This class is a basic benchmark.  (This exact instance is not very
+    general or configurable, but is subclassed to form the actual
+    standard benchmarks).
+
+    A benchmark consists of different `managers`, which 'manages' the
+    links of a certain set of nodes, deciding at each time step if its
+    links should be on or off.  To get the graph or communities at any
+    given time, we ask every manager to add some links to the graph,
+    or to give us its communities.
+    """
     def __init__(self, p_in=1, p_out=0, tau=100, opts={}):
         self.rng = random.Random(opts.get('seed', None))
         self.opts = opts
@@ -61,20 +92,28 @@ class Benchmark(object):
                                    p_in=p_in, p_out=p_out, tau=tau),
                     ]
         self.managers = managers
-        self.g = g = nx.Graph()
 
+        # In self.g, produce the standard initial (empty) graph with all nodes.
+        self.g = g = nx.Graph()
         for c in (c1, c2):
             for n in c:
                 g.add_node(n)
 
     def graph(self, t):
+        """Return a copy of the graph at time t."""
         g = self.g.copy()
+        # Ask each manager to add its links to g.
         for mgr in self.managers:
             mgr.t(g, t)
         return g
     t = graph
     def comms(self, t):
+        """Return a copy of the communities at time t.
+
+        Return value: dictionary mapping <community ID> to <set of
+        node IDs>."""
         comms = { }
+        # Ask each manager for its communities, add them to comms.
         for mrg in self.managers:
             for cname, cnodes in mrg.comms(t).iteritems():
                 if cname in comms:
@@ -83,6 +122,11 @@ class Benchmark(object):
         return comms
     def grammar(self):
         """List of dynamic community grammar statements for last t
+
+        The dynamic community grammar specifies basic operations like
+        'MERGE 4 5 TO 6'.
+
+        Return value: list of statements.
         """
         grammar = [ ]
         for mgr in self.managers:
@@ -92,6 +136,13 @@ class Benchmark(object):
 
     def write_temporal_edgelist(self, g, fname, t):
         """Write temporal edgelist: (a, b, weight, time) pairs.
+
+        This is kind of a hack to keep an open file object as a
+        benchmark is being run.  Please ignore it until it is
+        improved.
+
+        Output format: lines of `node1 node2 weight time`.  Weight
+        defaults to 1.
         """
         if not hasattr(self, '_temporal_edgelist_files'):
             self._temporal_edgelist_files = { }
@@ -106,6 +157,10 @@ class Benchmark(object):
         f.flush()
     def write_temporal_communities(self, fname, comms, t):
         """Write temporal communities in matrix format.
+
+        This is kind of a hack to keep an open file object as a
+        benchmark is being run.  Please ignore it until it is
+        improved.
 
         Format is: each line is one timestep.  Communities are written
         one per line in node sort order.  Overlaps, missing
@@ -132,6 +187,10 @@ class Benchmark(object):
     def write_temporal_commlist(self, fname, comms, t):
         """Write temporal communities in matrix format.
 
+        This is kind of a hack to keep an open file object as a
+        benchmark is being run.  Please ignore it until it is
+        improved.
+
         Format is: each line is one timestep.  Communities are written
         one per line in node sort order.  Overlaps, missing
         communities, and time information is not written."""
@@ -150,18 +209,34 @@ class Benchmark(object):
 
 
 def shuffled(rng, x):
-    if isinstance(x, list):
-        x = x[:]    # force a copy
-    else:
-        x = list(x)
+    """Non-inplace shuffling."""
+    x = list(x)    # force a copy
     rng.shuffle(x)
     return x
 
 def add_edge_nonexists(g, n1, n2):
+    """Add an edge to a graph, but raise error if edge already exists.
+
+    If the edge already exists, that means that it is managed by more
+    than one manager, and our internal accounting is messed up.  In
+    this case, raise an exception and abort the program."""
     assert not g.has_edge(n1, n2), "Graph has %s-%s."%(n1, n2)
     g.add_edge(n1, n2)
 
 def choose_random_edges(c1, c2=None, m=None, rng=None):
+    """Efficiently choose m random edges.
+
+    For a sparse graph, randomly pick pairs of nodes until we have m
+    unique pairs.  For a dense graph, make a list of all possible
+    edges and randomly select from that list.
+
+    Input arguments:
+        c1, c2: node sets.  If c2 is not given, pick internal edges
+                from c1.  If c2 is given, pick edges that go between
+                c1 and c2.
+        m: int, number of edges to choose.
+        rng: random number generator state engine.
+    """
     # One community internal edges
     if c2 is None:
         one_cmty = True
@@ -208,7 +283,51 @@ def choose_random_edges(c1, c2=None, m=None, rng=None):
 
 
 
-class Static(object):
+#
+# Managers
+#
+# Managers handle the interactions between specific sets of nodes.
+# For example, the "Static" benchmark will return the same set of
+# edges at all times, either within or between communities, at a given
+# density p.  The "Merging" benchmark has no internal edges, but adds
+# external edges between two communities that vary in time.
+#
+
+class _Manager(object):
+    """Prototype manager.
+
+    Exists only for documentation purposes."""
+    def t(self, g, t):
+        """Add edges to graph for a given time.
+
+        This method takes a graph at input (the graph at that time),
+        and adds edges to the graph inplace."""
+        raise NotImplementedError
+    def comms(self, t):
+        """Return communities at a given time.
+
+        Return format: dictionary mapping <community ID> to <set of
+        node IDs>"""
+        raise NotImplementedError
+    def manages(self, a, b):
+        """Returns True if the edge (a,b) is managed here.
+
+        This is used only for debugging purposes.  For a complete
+        benchmark, every pair of nodes should be managed once and only
+        once.  This is used in unit testing."""
+        raise NotImplementedError
+
+class Static(_Manager):
+    """Static edge manager.
+
+    This manager addes edges either within, or between two
+    communities, at a constant link density p.  The edges are decided
+    once and static for all time.  This could be used for either edges
+    within a community, or 'background' external density between
+    unrelated communities.
+
+    This manager never reports any communities.
+    """
     def __init__(self, bm, c1, c2=None, p=None):
         self.c1 = c1
         self.c2 = c2
@@ -257,7 +376,21 @@ class Static(object):
         return False
 
 
-class Merging(object):
+class Merging(_Manager):
+    """Manager for merging process.
+
+    This manager takes two communities (c1, c2) and the parameters
+    (p_low, p_high, tau, phasefactor).  At each time, adds edges
+    between c1 and c2.  Return the communities c1 and c2 separately,
+    or merged, depending on time and options.
+
+    This manager does not add internal edges in c1 or c2.  You must
+    use a `Static` manager for that.
+
+    Unless bm.opts.no_det_limit is true, report communities as merged
+    at the detectability limit.  Finite size effects are not taken
+    into account.
+    """
     def __init__(self, bm, c1, c2, p_low, p_high, tau, phasefactor=0.,
                  c_id_1=0, c_id_2=1, c_id_merged=2):
         self.bm = bm
@@ -313,22 +446,26 @@ class Merging(object):
         #x = -.5*(math.cos(omega)-1)
         return x
     def m_at_t(self, t):
+        """Number of edges at a given time."""
         x = self.x_at_t(t)
         m = self.m_low + x*(self.m_high-self.m_low)
         debug('Merging: x, m: %s %s %s %s', x, m, self.m_low, self.m_high)
         return m
     def p_at_t(self, t):
+        """Edge density at a given time."""
         x = self.x_at_t(t)
         p = self.p_low + x*(self.p_high-self.p_low)
         return p
 
     def t(self, g, t):
+        """Graph at a given time."""
         m = self.m_at_t(t)
         edges = self.edges[:int(round(m))]
         #g.add_edges_from(edges)
         for a,b in edges:
             add_edge_nonexists(g, a, b)
     def comms(self, t):
+        """Communities at a given time."""
         # Find if we are merged or not
         is_merged = True
         if self.bm.opts.get('no_det_limit', False):
@@ -398,9 +535,16 @@ class Merging(object):
                     c2id: self.c2}
 
 
+class ExpandContract(_Manager):
+    """Expand/contract manager.
 
+    This manager takes two communities (c1, c2) and the parameters
+    (p_in, p_out, tau, fraction, phasefactor).  At each time, adds
+    within c1 and c2 and between c1 and c2 to make communities.
 
-class ExpandContract(object):
+    Unlike the Merging manager, this manager *does* add internal edges
+    in c1 and c2.
+    """
     def __init__(self, bm, c1, c2, p_in, p_out, tau, fraction=.5,
                  phasefactor=0., c_id_1=0, c_id_2=1):
         self.p_in = p_in
@@ -429,6 +573,8 @@ class ExpandContract(object):
         c1_minsize = int(round(len(c1)*(1-self.fraction)))
         c1_maxsize = int(round(len(c1)+len(c2)*(self.fraction)))
 
+        # For this manager, we pre-compute all edges that can be
+        # present (below).
         with override_numpy_seed(self.bm.rng):
           for i, node in enumerate(order):
             # Internal edges from node to c1
@@ -483,7 +629,7 @@ class ExpandContract(object):
             g.add_node(n)
             g.add_edges_from((n, n2) for n2 in int_1_edges[n])
         ccs = nx.connected_components(g)
-        print ccs
+        #print ccs
         if len(ccs) != 1:
             raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n1=%s)"%(
                                     self.p_in, len(g)))
@@ -493,11 +639,10 @@ class ExpandContract(object):
             g.add_node(n)
             g.add_edges_from((n, n2) for n2 in int_2_edges[n])
         ccs = nx.connected_components(g)
-        print ccs
+        #print ccs
         if len(ccs) != 1:
             raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n2=%s)"%(
                                     self.p_in, len(g)))
-
 
 
     def manages(self, a, b):
@@ -523,6 +668,7 @@ class ExpandContract(object):
         c1 = int(round(y))
         return c1
     def comms(self, t):
+        """Communities at a given time."""
         c1 = self.c1_size_at_t(t)
         # Figure new cids
         if self.bm.opts.get('cids') == 'snapshot':
@@ -547,6 +693,7 @@ class ExpandContract(object):
                 c2id: self.order[c1:]}
 
     def t(self, g, t):
+        """Graph at a given time."""
         c1size = self.c1_size_at_t(t)
         #print 'merging c1:', x, y, c1
         debug('ExpandContract: t=%s, c1=%s', t, c1size)
@@ -590,8 +737,13 @@ class ExpandContract(object):
 
 
 
+#
+# Standard benchmarks.
+#
+
 re_k = re.compile('k= *([0-9.]+) *')
 class _StdBase(Benchmark):
+    """Base class for standard benchmarks."""
     _default_p_in = 'k=16'
     _default_p_out = 'k=0'
     def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100,
@@ -786,7 +938,7 @@ def main_argv(argv=sys.argv):
             args)
 
 def get_model(name=None, **kwargs):
-    """Return a given model names, instantiated with **kwargs"""
+    """Return a given model name, instantiated with **kwargs"""
     bm = globals()[name]
     bm = bm(**kwargs)
     return bm
@@ -849,7 +1001,7 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
                 label = 't=%s, command line: %s'%(t, ' '.join(sys.argv))
                 comm_writer(f, comms, label)
         print t, len(g), g.number_of_edges(), len(comms),sorted(comms.keys())
-              #dict((k, len(v)) for k,v in comms.iteritems())
+        #dict((k, len(v)) for k,v in comms.iteritems())
 
 
 
