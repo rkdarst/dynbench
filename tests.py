@@ -179,9 +179,11 @@ class _TestRandom(unittest.TestCase):
         try:
             M = bm.main(argv=[bm.__file__, self.model_name,
                               tmpdir+'/output-1', # outdir
-                              #'--comm-format=bynode', # this should be default
+                              '--comm-format=bynode',
+                              '--graph-format=edgelist',
                               ])
-            assert_equal(len(os.listdir(tmpdir)), 202, "202 files should be written")
+            assert_equal(len(os.listdir(tmpdir)), 202,
+                         "202 files should be written (%s actual)"%len(os.listdir(tmpdir)))
             comms = M.comms(2)
             for line in open(tmpdir+'/output-1.t00002.comms'):
                 if line.startswith("#"): continue
@@ -197,8 +199,11 @@ class _TestRandom(unittest.TestCase):
             M = bm.main(argv=[bm.__file__, self.model_name,
                               tmpdir+'/output-1', # outdir
                               '--comm-format=oneline',
+                              '--graph-format=tedgelist',
                               ])
-            assert_equal(len(os.listdir(tmpdir)), 202, "202 files should be written")
+            # 102 files written: 101 from communities and 1 for graph.
+            assert_equal(len(os.listdir(tmpdir)), 102,
+                         "102 files should be written (%s actual)"%len(os.listdir(tmpdir)))
             comms = M.comms(2)
             for line in open(tmpdir+'/output-1.t00002.comms'):
                 if line.startswith('# label: '):
