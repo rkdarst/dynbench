@@ -104,7 +104,7 @@ class Benchmark(object):
         g = self.g.copy()
         # Ask each manager to add its links to g.
         for mgr in self.managers:
-            mgr.t(g, t)
+            mgr.g_add_edges(g, t)
         return g
     t = graph
     def comms(self, t):
@@ -297,7 +297,7 @@ class _Manager(object):
     """Prototype manager.
 
     Exists only for documentation purposes."""
-    def t(self, g, t):
+    def g_add_edges(self, g, t):
         """Add edges to graph for a given time.
 
         This method takes a graph at input (the graph at that time),
@@ -354,7 +354,7 @@ class Static(_Manager):
                                            rng=self.bm.rng)
         debug("Static, links=%s", len(self.edges_active))
 
-    def t(self, g, t):
+    def g_add_edges(self, g, t):
         for a,b in self.edges_active:
             add_edge_nonexists(g, a, b)
         #g.add_edges_from(self.edges_active)
@@ -457,7 +457,7 @@ class Merging(_Manager):
         p = self.p_low + x*(self.p_high-self.p_low)
         return p
 
-    def t(self, g, t):
+    def g_add_edges(self, g, t):
         """Graph at a given time."""
         m = self.m_at_t(t)
         edges = self.edges[:int(round(m))]
@@ -692,7 +692,7 @@ class ExpandContract(_Manager):
         return {c1id: self.order[:c1],
                 c2id: self.order[c1:]}
 
-    def t(self, g, t):
+    def g_add_edges(self, g, t):
         """Graph at a given time."""
         c1size = self.c1_size_at_t(t)
         #print 'merging c1:', x, y, c1
@@ -957,7 +957,7 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
         opts={}):
     """Main loop to do a running."""
     for t in range(maxt+1):
-        g = bm.t(t)
+        g = bm.graph(t)
         comms = bm.comms(t)
         grammar = bm.grammar()
         for stmt in grammar:
