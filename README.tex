@@ -467,6 +467,46 @@ The following statements are available
 \end{itemize}
 
 
+\section{Dynamic community comparison}
+
+The tool \texttt{dyncmtycmp.py} does a windowed community comparison,
+as described in our paper.
+
+Standard syntax:
+\begin{verbatim}
+dyncmtycmp.py input1 input2 [--dt=DT] [--cmp=NAME] [options]
+\end{verbatim}
+
+Positional arguments:
+\begin{description}
+\item[input1] Input file \#1.  In either \texttt{tedgelist} or
+  \texttt{tmatrix} format.
+\item[input2] Input file \#2.  Same as \texttt{input1}.
+\end{description}
+
+Options:
+\begin{description}
+\item[-{}-dt=INT] Timestep delta.  The code compares the $n$th snapshot to
+  the $n+dt$th snapshot.  If $dt=0$, then this is the same as the
+  comparing identical snapshots to each other.  Note that the name
+  $\Delta t$ is a slight misnomer, this is not a time delta but an
+  index delta.
+\item[-{}-cmp=NAME] Which comparison function to use.  Acceptable
+  names are \texttt{vi}, \texttt{vi\_norm}, \texttt{nmi},
+  \texttt{jaccard}, or anything in \texttt{pcd.cmtycmp}.
+\item[-{}-format=NAME] Specify input format for the files.  Choices
+  are \texttt{auto}, \texttt{tcommlist}, \texttt{tmatrix}.  Default is
+  \texttt{auto}, which will do a basic check to figure it out.
+\end{description}
+
+Other notes:
+\begin{itemize}
+\item There is a simple library interface, just look in the code to
+  see since it is not documented here.
+\end{itemize}
+
+
+
 
 \section{Technical notes}
 \label{sec:technical}
