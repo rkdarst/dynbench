@@ -99,7 +99,7 @@ $\tau$ are as in StdGrow.
   need installation.
 \item To load the code as a library, place \texttt{bm} on your Python
   path or the directory from which your other code runs.  If you want
-  to do this, you probably already know what to do.
+  to do this, you probably already know what you are doing.
 \end{itemize}
 
 
@@ -152,7 +152,8 @@ Required positional arguments:
   in section \ref{sec:about}.
 \item[OutputPrefix] Where to write output.  Technically, this is
   optional, if not specified no output will be written and you will
-  only see some information as things are calculated.
+  only see some information as things are calculated.  This could be
+  useful for testing parameters and watching the community sizes produced.
   \texttt{OutputPrefix} can contain directory names.  Files will be
   written to \texttt{\textsl{OutputPrefix}.tNNNNN.*}, where \texttt{NNNNN} is
   the corresponding time step.
@@ -204,21 +205,38 @@ Other options:
 \item[-{}-tau=REAL] Model time period.  The model repeats after this
   time.  The graph and communities at points $t$ and $t+\tau$ are
   identical.  (library option: \code{tau=FLOAT})
-\item [-{}-graph-format=NAME] Output format for graph writing.  Options
-  include \texttt{edgelist} (the default), \texttt{pajek},
-  \texttt{null}, or any \texttt{networkx} \texttt{write\_*} function
-  suffix (such as \texttt{gml} or \texttt{gexf}).  (library option: not
-  applicable)
-\item [-{}-comm-format=NAME] Output format for community writing.  Options
-  are \texttt{oneline} (the default), \texttt{bynode}, \texttt{pajek},
-  or \texttt{null}.  (library option: not applicable)
+\item [-{}-graph-format=NAME] Output format for graph writing.  See
+  section \ref{sec:output-formats} for information on choices.
+  (library option: not applicable)
+\item [-{}-comm-format=NAME] Output format for community writing.  See
+  section \ref{sec:output-formats} for information on choices.
+  (library option: not applicable)
 \item [-{}-seed=STRING] Seed for the random number generator, passed
-  directly to Python's \code{random.Random.seed}.  (library
+  directly to Python's \code{random.Random.seed}.  \texttt{scipy}'s
+  random number generator is seeded from this, when needed.  (library
   option: \texttt{opts=\{"seed": SEED\}})
-\item [-{}-no-det-limit] Seed for the random number generator.  (library
+\item [-{}-no-det-limit] If this option is given, only consider
+  communities merged when $\pin=\pout^*$.  If not given (detectability
+  limit support is on), communities are only considered merged
+  according to the sparse-limit detectability limit formula.  (library
   option: \texttt{opts=\{"no\_det\_limit": True\}})
-\item [-{}-Gnm] (library
-  option: \texttt{opts=\{"Gnm": True\}})
+\item [-{}-Gnm] If given, stochastic block models are taken from a
+  G$_\mathrm{nm}$ ensemble instead of a G$_\mathrm{np}$ ensemble.  In
+  practice, this means that instead of the number of edges chosen from
+  a binomial distribution with parameters $n(n-1)/2, p$, we have
+  exactly $\textrm{round}(n(n-1)p/2)$ edges.  This is also true for
+  edges between communities.  \textbf{The \texttt{StdGrow} (and
+    \texttt{StdMerge}) benchmarks do not support this, since this has
+    not been implemented in the \texttt{ExpandContract} manager
+    yet!} (library option: \texttt{opts=\{"Gnm": True\}})
+\item[-{}-cids=STRING] By default, community IDs are reused.  Other
+  choices include: \texttt{snapshot}: New community IDs are generated
+  on every snapshot, they are never reused.  \texttt{new}: Produce new
+  community IDs after each critical event.  For example, after two
+  communities merge, a new community ID is created, and when this
+  splits again, yet again new community IDs are created.  Community
+  IDs can last for several timesteps, but they will not come back if
+  they are lost.  (library option: \texttt{opts=\{"cids": STRING\}})
 \end{description}
 
 
@@ -328,18 +346,125 @@ different community sizes.
 \label{sec:usage-notes}
 
 \subsection{Disconnected communities}
+If the values of community size $n$ and internal edge density $\pin$
+are too low, it is easily possible to have one community
+disconnected.  We do not recalculate links for individual disconnected
+nodes or components.  Instead, we abort the entire process and the
+benchmark fails with \texttt{DisconnectedError}.  This is a conscious
+choice to not in any way affect the ensemble of possible states.
+Instead, we have taken the view that parameters much be such that this
+is an unlikely occurrence, and then we abort on disconnection.
 
 \subsection{$\kin$ and $\kout$}
+If $\kin$ or $\kout$ are specified, we take $\pin=\kin/(n-1)$ or
+$\pout=\kout/n$, with $n$ being the community size.
 
 \subsection{Output formats}
+\label{sec:output-formats}
 
+The following output formats are available.  It just so happens that
+the code currently produces graphs with consecutive node IDs from $0$
+to $N-1$.  However, this is just due to the limited scope of the
+current benchmark, internally and in most output formats, the
+benchmark is designed to extend to cases where nodes are added and
+removed, leading to non-consecutive node IDs (for example, node 2 is
+removed).  Furthermore, a likely extension is to overlapping
+communities.  Not all output formats can support this.
 
+\textbf{Graph output formats}
+\begin{itemize}
+\item \texttt{edgelist}: An edgelist (lines of \texttt{node1 node2}),
+  one file per timestep.
+\item \texttt{pajek}: Pajek graph format, one file per timestep.
+  Unlike the other output formats, these nodes are one-indexed instead
+  of zero-indexed.  The community format will still be zero-indexed
+  unless otherwise stated.  This format will not support
+  non-consecutive nodes, once that exists.
+\item \texttt{null}: Do not write graphs
+\item \texttt{tedgelist} (default): Temporal edgelist.  Like an edgelist, but
+  with an extra column for time of the edge.  Lines of \texttt{node1
+    node2 weight time}.  In current implementation, weight is always
+  $1.0$.  For each edge, there is a unique line for each time it
+  exists.  In current implementation, times are ascending.
+\item \texttt{other}: Any other graph writer in networkx can be used.
+  Writer is looked up as \texttt{networkx.write\_}\textsl{name}.
+\end{itemize}
+
+\textbf{Community output formats}
+\begin{itemize}
+\item \texttt{oneline}:  There is one file per timestep.  Each file
+  has one community written per line.  Each line has node IDs written
+  space-separated.  Time information is in the filename.  The
+  community name is in a label in a comment above each line.  This
+  format supports overlaps.
+\item \texttt{bynode}: Lines with \texttt{node community} pairs,
+  one file per timestap.  Time information is in the filename.  This
+  format supports overlaps.
+\item \texttt{pajek}: Pajek \texttt{.clu} format, one file per
+  timestep.  This format has the same problem as the Pajek graph
+  format.
+\item \texttt{tcommlist} (default): One file for all timesteps, with
+  lines \texttt{time node comm}.  This format supports overlaps, there
+  will be one line for each overlap with same (time, node)
+  information.
+\item \texttt{tmatrix}: All nodes are sorted by node ID, and
+  communities of each node are written consecutively, all nodes for
+  one timestep on each line.  The file appears to be a big matrix with
+  dimensions of nodes (across) and time (lines).  This format does not
+  contain information on node IDs (making it unsuitable for extensions
+  with added/removed nodes) or timestamps (so you must know timestamps
+  from some other source).
+\end{itemize}
 \subsection{Community tracking information}
 
 \subsection{Time-reversibility}
+The code is time-reversible.  In other words, you can request the
+graph at time $t=70$ and then request the graph at time $t=10$.  This
+as because all state is computed at benchmark initialization.
+However, the downside to this is that the state is completely
+periodic, you can go an infinite number of multiples of the period
+$\tau$ and you will still return to the same state.
 
 \subsection{Threadsafety}
+All code is threadsafe (including/especially random number generation).
 
+
+\section{Dynamic community grammar}
+\label{sec:dyn-grammar}
+
+The dynamic community grammar provides a standard language for
+describing transitions in communities.  This is the ``critical
+points'' that some methods try to detect.  For example, the three
+current grammar statements indicate one community continuing in time,
+two communities merging, or two communities splitting.
+
+The grammar is printed to \texttt{stdout} when it runs.  There are no
+tools for using this yet.
+
+Each statement is represented as a Python tuple.  The zeroth element
+is a string describing the action, followed by other elements
+describing the communities operated on.  When using the benchmark as a
+library, a list of these statements can be returned \textit{for the
+  last timestep} by \texttt{Benchmark.grammar()}.
+
+The following statements are available
+\begin{itemize}
+\item \texttt{("Continue", (old\_cid, ), (new\_cid, ))}.  Indicates that the
+  community \texttt{old\_cid} is now represented by \texttt{new\_cid}.
+  This is the same community (maybe with a few nodes added or
+  removed), but the ID has changed.  This statement is not generated
+  if \texttt{old\_cid} is the same as \texttt{new\_cid}.  Note that
+  both IDs are in length-1 tuples.
+\item \texttt{("Merge", (old\_cid0, old\_cid1, ...), (new\_cid, ))} The
+  communities in the first element lost their individuality (they
+  became too densely connected) and were
+  merged into a new community of name \texttt{new\_cid}.  Note that
+  \texttt{new\_cid} is in a length-1 tuple.
+\item \texttt{("Split", (old\_cid, ), (new\_cid0, new\_cid1, ...))}  The
+  community in the first element lost its cohesiveness was split into
+  multiple new communities named in the second element.  Note that
+  \texttt{old\_cid} is in a length-1 tuple.
+\end{itemize}
 
 
 

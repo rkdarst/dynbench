@@ -908,8 +908,12 @@ def main_argv(argv=sys.argv):
     parser.add_argument("--k_in",  type=float)
     parser.add_argument("--k_out", type=float)
     parser.add_argument("--tau",   type=int)
-    parser.add_argument("--graph-format", default='tedgelist', help="How to write graph, choices='edgelist', 'pajek'.")
-    parser.add_argument("--comm-format", default='tcommlist', help="How to write communities, choices='oneline', 'bynode', 'pajek'.")
+    parser.add_argument("--graph-format", default='tedgelist',
+        help="How to write graph, choices=edgelist, pajek, "
+             "tedgelist(default), null, <others>.")
+    parser.add_argument("--comm-format", default='tcommlist',
+        help="How to write communities, choices=oneline, bynode, pajek, "
+             "tcommlist(default), tmatrix.")
     #parser.add_argument("--", help="", type=int, default=)
     parser.add_argument("--seed",  default=None, help="Random seed")
     parser.add_argument("--no-det-limit",  action='store_true',
