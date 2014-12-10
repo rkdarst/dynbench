@@ -134,78 +134,6 @@ class Benchmark(object):
                 grammar.append(stmt)
         return grammar
 
-    def write_temporal_edgelist(self, g, fname, t):
-        """Write temporal edgelist: (a, b, weight, time) pairs.
-
-        This is kind of a hack to keep an open file object as a
-        benchmark is being run.  Please ignore it until it is
-        improved.
-
-        Output format: lines of `node1 node2 weight time`.  Weight
-        defaults to 1.
-        """
-        if not hasattr(self, '_temporal_edgelist_files'):
-            self._temporal_edgelist_files = { }
-        filedata = self._temporal_edgelist_files
-        if fname not in filedata:
-            print 'opening g'
-            f = filedata[fname] = open(fname, 'w')
-        else:
-            f = filedata[fname]
-        for a, b, data in g.edges_iter(data=True):
-            print >> f, a, b, data.get('weight', 1), t
-        f.flush()
-    def write_temporal_communities(self, fname, comms, t):
-        """Write temporal communities in matrix format.
-
-        This is kind of a hack to keep an open file object as a
-        benchmark is being run.  Please ignore it until it is
-        improved.
-
-        Format is: each line is one timestep.  Communities are written
-        one per line in node sort order.  Overlaps, missing
-        communities, and time information is not written."""
-        if not hasattr(self, '_temporal_comms_files'):
-            self._temporal_comms_files = { }
-        filedata = self._temporal_comms_files
-        if fname not in filedata:
-            print 'opening c'
-            f = filedata[fname] = open(fname, 'w')
-        else:
-            f = filedata[fname]
-        # get node -> cmty map
-        nodecmtys = { }
-        for cname, cnodes in comms.iteritems():
-            for node in cnodes:
-                nodecmtys[node] = cname
-        memberships = [ ]
-        # Assemble list and write it
-        for n in sorted(nodecmtys):
-            memberships.append(nodecmtys[n])
-        print >> f, ' '.join(str(x) for x in memberships)
-        f.flush()
-    def write_temporal_commlist(self, fname, comms, t):
-        """Write temporal communities in matrix format.
-
-        This is kind of a hack to keep an open file object as a
-        benchmark is being run.  Please ignore it until it is
-        improved.
-
-        Format is: each line is one timestep.  Communities are written
-        one per line in node sort order.  Overlaps, missing
-        communities, and time information is not written."""
-        if not hasattr(self, '_temporal_commlist_files'):
-            self._temporal_commlist_files = { }
-        filedata = self._temporal_commlist_files
-        if fname not in filedata:
-            print 'opening c'
-            f = filedata[fname] = open(fname, 'w')
-        else:
-            f = filedata[fname]
-        for cname, cnodes in comms.iteritems():
-            for node in cnodes:
-                print >> f, t, node, cname
-        f.flush()
 
 
 def shuffled(rng, x):
@@ -996,7 +924,7 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
             elif graph_format == 'null':
                 pass
             elif graph_format == 'tedgelist':
-                bm.write_temporal_edgelist(g, output+'.tgraph', t)
+                write_temporal_edgelist(bm, g, output+'.tgraph', t)
             else:
                 try:
                     graphwriter = getattr(nx, 'write_'+graph_format)
@@ -1009,10 +937,10 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
             elif comm_format == 'pajek':  comm_writer = write_comms_pajek
             elif comm_format == 'null':   comm_writer = None
             elif comm_format == 'tmatrix':
-                bm.write_temporal_communities(output+'.tcomms', comms, t)
+                write_tmatrix_line(bm, output+'.tcomms', comms, t)
                 comm_writer = None
             elif comm_format == 'tcommlist':
-                bm.write_temporal_commlist(output+'.tcomms', comms, t)
+                write_temporal_commlist(bm, output+'.tcomms', comms, t)
                 comm_writer = None
             else:
                 raise ValueError("Unknown comm format: %s"%comm_format)
@@ -1022,8 +950,8 @@ def run(bm, maxt=100, output=None, graph_format='edgelist',
                 f = open(prefix+'.comms', 'w')
                 label = 't=%s, command line: %s'%(t, ' '.join(sys.argv))
                 comm_writer(f, comms, label)
-        print t, len(g), g.number_of_edges(), len(comms),sorted(comms.keys())
-        #dict((k, len(v)) for k,v in comms.iteritems())
+        print t, len(g), g.number_of_edges(), len(comms), \
+            dict((k, len(v)) for k,v in comms.iteritems())
 
 
 
@@ -1058,6 +986,80 @@ def write_comms_pajek(f, comms, label=None):
             nodecmtys[node] = cname
     for node in sorted(nodecmtys):
         print >> f, nodecmtys[node]
+def write_temporal_edgelist(bm, g, fname, t):
+    """Write temporal edgelist: (a, b, weight, time) pairs.
+
+    This is kind of a hack to keep an open file object as a
+    benchmark is being run.  Please ignore it until it is
+    improved.
+
+    Output format: lines of `node1 node2 weight time`.  Weight
+    defaults to 1.
+    """
+    if not hasattr(bm, '_temporal_edgelist_files'):
+        bm._temporal_edgelist_files = { }
+    filedata = bm._temporal_edgelist_files
+    if fname not in filedata:
+        print 'opening g'
+        f = filedata[fname] = open(fname, 'w')
+    else:
+        f = filedata[fname]
+    for a, b, data in g.edges_iter(data=True):
+        print >> f, a, b, data.get('weight', 1), t
+    f.flush()
+def write_tmatrix_line(bm, fname, comms, t):
+    """Write temporal communities in matrix format.
+
+    This is kind of a hack to keep an open file object as a
+    benchmark is being run.  Please ignore it until it is
+    improved.
+
+    Format is: each line is one timestep.  Communities are written
+    one per line in node sort order.  Overlaps, missing
+    communities, and time information is not written."""
+    if not hasattr(bm, '_temporal_comms_files'):
+        bm._temporal_comms_files = { }
+    filedata = bm._temporal_comms_files
+    if fname not in filedata:
+        print 'opening c'
+        f = filedata[fname] = open(fname, 'w')
+    else:
+        f = filedata[fname]
+    # get node -> cmty map
+    nodecmtys = { }
+    for cname, cnodes in comms.iteritems():
+        for node in cnodes:
+            if node in nodecmtys:
+                raise NotImplementedError("tmatrix format does not "
+                                          "support overlaps.")
+            nodecmtys[node] = cname
+    memberships = [ ]
+    # Assemble list and write it
+    for n in sorted(nodecmtys):
+        memberships.append(nodecmtys[n])
+    print >> f, ' '.join(str(x) for x in memberships)
+    f.flush()
+def write_temporal_commlist(bm, fname, comms, t):
+    """Write temporal communities in one-line-per-node format.
+
+    This is kind of a hack to keep an open file object as a
+    benchmark is being run.  Please ignore it until it is
+    improved.
+
+    Format is: each line contains a 'time node community' tuple,
+    space-separated."""
+    if not hasattr(bm, '_temporal_commlist_files'):
+        bm._temporal_commlist_files = { }
+    filedata = bm._temporal_commlist_files
+    if fname not in filedata:
+        print 'opening c'
+        f = filedata[fname] = open(fname, 'w')
+    else:
+        f = filedata[fname]
+    for cname, cnodes in comms.iteritems():
+        for node in cnodes:
+            print >> f, t, node, cname
+    f.flush()
 
 
 if __name__ == "__main__":
