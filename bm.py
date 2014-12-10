@@ -434,12 +434,25 @@ class Merging(_Manager):
         return False
 
     def x_at_t(self, t):
+        """Return x(t) which defines the periodicity of the system.
+
+        Right now, this is a basic and non-extendable interface.
+        However, with code changes this can be easily extended."""
         tau = self.tau
+        def mod1(x): return x % 1.0
+
+        # Our standard x(t_norm) function.  This is what is defined in
+        # the paper.
+        # t_norm  x
+        #  0.0    0
+        #   .25   0.5
+        #   .5    1.0
+        #   .75   0.5
+        #  1.0    0
+        def x(t): return 2*abs(mod1(t+.5)-.5)
+
         # Sawtooth profile
-        x =  t/float(self.tau) + self.phasefactor
-        x = ((x + .5)  % 1) - .5   # x \in (-.5, .5]
-        x = abs(x)                 # x \in [0,   .5]
-        x *= 2                     # x \in [0,   1]
+        x = x(t/float(self.tau) + self.phasefactor)
         ## Cosine profile
         #x = t / float(self.tau)
         #omega = 2*pi*x
@@ -655,10 +668,15 @@ class ExpandContract(_Manager):
     def x_at_t(self, t):
         # mod1(x) = x - floor(x)   # gnuplot
         def mod1(x): return x % 1.0
+        def x(t): return 2*abs(mod1(t+.5)-.5)
 
-        x = t / float(self.tau) + self.phasefactor
-        x = 2 *abs(mod1(x+.5 -.75)-.5)  # .5-1-0-.5 with period 1
-        return x
+        # The factor of 1/4 means we start at x=.5.
+        z = x(t/float(self.tau) + 1/4. + self.phasefactor)
+        # z goes .5-1-.5-0-.5 with period 1.  Thus, this function
+        # doesn't actually return the x(t) defined in the paper!  Just
+        # be aware.
+
+        return z
     def c1_size_at_t(self, t):
         x = self.x_at_t(t)
         #bound = int(round(len(self.order)*x))
