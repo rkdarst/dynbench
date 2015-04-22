@@ -44,8 +44,7 @@ def test_assert_dist():
     assert_distribution(stats.norm(0).rvs, 0, 1)
 
 def assert_compnents(g, n=1):
-    ccs = nx.connected_components(g)
-    n_ccs = len(ccs)
+    n_ccs = nx.number_connected_components(g)
     if n != n_ccs:
         raise AssertionError("Number of connected components wrong: %s!=%s (%s)"%(
             n, n_ccs, [len(cc) for cc in ccs]))

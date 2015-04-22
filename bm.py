@@ -288,7 +288,7 @@ class Static(_Manager):
         #g.add_edges_from(self.edges_active)
 
         if self.c2 is None:
-            if len(nx.connected_components(g.subgraph(self.c1))) != 1:
+            if nx.number_connected_components(g.subgraph(self.c1)) != 1:
                 raise DisconnectedError("Subgraph is disconnected (Static object)")
     def comms(self, t):
         return { }
@@ -569,9 +569,8 @@ class ExpandContract(_Manager):
         for n in order[:c1_minsize]:
             g.add_node(n)
             g.add_edges_from((n, n2) for n2 in int_1_edges[n])
-        ccs = nx.connected_components(g)
         #print ccs
-        if len(ccs) != 1:
+        if nx.number_connected_components(g) != 1:
             raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n1=%s)"%(
                                     self.p_in, len(g)))
         # c2
@@ -579,9 +578,8 @@ class ExpandContract(_Manager):
         for n in order[c1_maxsize:]:
             g.add_node(n)
             g.add_edges_from((n, n2) for n2 in int_2_edges[n])
-        ccs = nx.connected_components(g)
         #print ccs
-        if len(ccs) != 1:
+        if nx.number_connected_components(g) != 1:
             raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n2=%s)"%(
                                     self.p_in, len(g)))
 
@@ -672,12 +670,12 @@ class ExpandContract(_Manager):
         # check connectedness (we should never get to this point,
         # should be checked above.  Left for sanity checking, comment
         # this out later).
-        if len(nx.connected_components(g.subgraph(self.order[0:c1size]))) != 1:
-            ccs = nx.connected_components(g.subgraph(self.order[0:c1size]))
+        if nx.number_connected_components(g.subgraph(self.order[0:c1size])) != 1:
+            ccs = list(nx.connected_components(g.subgraph(self.order[0:c1size])))
             raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n1=%s, c1=%s, nodes=%s, order=%s, ccs=%s)"%(
                 self.p_in, c1size, self.c_id_1, self.order[0:c1size], self.order, ccs))
-        if len(nx.connected_components(g.subgraph(self.order[c1size:len(self.order)]))) != 1:
-            ccs = nx.connected_components(g.subgraph(self.order[c1size:len(self.order)]))
+        if nx.number_connected_components(g.subgraph(self.order[c1size:len(self.order)])) != 1:
+            ccs = list(nx.connected_components(g.subgraph(self.order[c1size:len(self.order)])))
             raise DisconnectedError("Subgraph is disconnected (ExpandContract, p_in=%f, n2=%s, c2=%s, nodes=%s, order=%s, ccs=%s)"%(
                 self.p_in, len(self.order)-c1size, self.c_id_2, self.order[c1size:len(self.order)], self.order, ccs))
 
