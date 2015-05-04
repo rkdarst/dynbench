@@ -1,3 +1,4 @@
+import collections
 import contextlib
 import math
 import random
@@ -133,6 +134,32 @@ class Benchmark(object):
             for stmt in getattr(mgr, '_grammar', [ ]):
                 grammar.append(stmt)
         return grammar
+    def _internal_edges(self, t):
+        """Convenience method: return only edges within the same community."""
+        g = self.graph(t)
+        comms = self.comms(t)
+        node_comms = collections.defaultdict(set)
+        for c, nodes in comms.iteritems():
+            for n in nodes:
+                node_comms[n].add(c)
+        edges = [ ]
+        for a, b in g.edges_iter():
+            if len(node_comms[a] & node_comms[b]) > 0:
+                edges.append((a,b))
+        return edges
+    def _external_edges(self, t):
+        """Convenience method: return only edges within the same community."""
+        g = self.graph(t)
+        comms = self.comms(t)
+        node_comms = collections.defaultdict(set)
+        for c, nodes in comms.iteritems():
+            for n in nodes:
+                node_comms[n].add(c)
+        edges = [ ]
+        for a, b in g.edges_iter():
+            if len(node_comms[a] & node_comms[b]) == 0:
+                edges.append((a,b))
+        return edges
 
 
 
