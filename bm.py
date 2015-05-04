@@ -716,8 +716,8 @@ re_k = re.compile('k= *([0-9.]+) *')
 re_ktot = re.compile('ktot= *([0-9.]+) *')
 class _StdBase(Benchmark):
     """Base class for standard benchmarks."""
-    _default_p_in = 'k=16'
-    _default_p_out = 'k=0'
+    _default_p_in = 0.5
+    _default_p_out = 0.05
     def __init__(self, p_in=1., p_out=0., n=32, q=4, tau=100,
                  opts={}):
         self.rng = random.Random(opts.get('seed', None))
