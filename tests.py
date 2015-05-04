@@ -145,10 +145,20 @@ class _TestRandom(unittest.TestCase):
         assert_distribution(lambda: getM().t(0).number_of_edges(),
                             (128*(15*4)) * .5, std=None, p=.01)
 
+        def getM():
+            return bm.get_model(self.model_name, p_in='k=15', p_out='ktot=45')
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            (128*(15*4)) * .5, std=None, p=.01)
+
         # cli
         k = 20
         def getM():
             return bm.main_argv(['X', self.model_name, '--k_in=%d'%k, '--k_out=%d'%k])[0]
+        assert_distribution(lambda: getM().t(0).number_of_edges(),
+                            (128*(k*4)) * .5, std=None, p=.01)
+
+        def getM():
+            return bm.main_argv(['X', self.model_name, '--k_in=%d'%k, '--k_out_tot=60'])[0]
         assert_distribution(lambda: getM().t(0).number_of_edges(),
                             (128*(k*4)) * .5, std=None, p=.01)
 

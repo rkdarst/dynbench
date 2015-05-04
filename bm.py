@@ -686,6 +686,7 @@ class ExpandContract(_Manager):
 #
 
 re_k = re.compile('k= *([0-9.]+) *')
+re_ktot = re.compile('ktot= *([0-9.]+) *')
 class _StdBase(Benchmark):
     """Base class for standard benchmarks."""
     _default_p_in = 'k=16'
@@ -701,6 +702,8 @@ class _StdBase(Benchmark):
             p_in  = float(re_k.match(p_in).group(1)) / (n-1)
         if isinstance(p_out, str) and re_k.match(p_out):
             p_out = float(re_k.match(p_out).group(1)) / n
+        elif isinstance(p_out, str) and re_ktot.match(p_out):
+            p_out = float(re_ktot.match(p_out).group(1)) / ((q-1)*n)
         self.p_in = p_in
         self.p_out = p_out
 
@@ -851,6 +854,7 @@ def main_argv(argv=sys.argv):
     parser.add_argument("--p_out", help="External edge density",type=float)
     parser.add_argument("--k_in",  type=float)
     parser.add_argument("--k_out", type=float)
+    parser.add_argument("--k_out_tot", type=float)
     parser.add_argument("--tau",   type=int)
     parser.add_argument("--graph-format", default='tedgelist',
         help="How to write graph, choices=edgelist, pajek, "
@@ -879,8 +883,15 @@ def main_argv(argv=sys.argv):
     print model_params
     if args.k_in is not None:
         model_params['p_in']  = 'k=%f'%args.k_in
+        assert args.p_in is None, "--k_in incompatible with --p_in"
     if args.k_out is not None:
         model_params['p_out'] = 'k=%f'%args.k_out
+        assert args.p_out is None, "--k_out incompatible with --p_out"
+        assert args.k_out_tot is None, "--k_out incompatible with --k_out_tot"
+    if args.k_out_tot is not None:
+        model_params['p_out'] = 'ktot=%f'%args.k_out_tot
+        assert args.k_out is None, "--k_out_tot incompatible with --k_out"
+        assert args.p_out is None, "--k_out_tot incompatible with --p_out"
 
     return (get_model(args.bm_model, opts=args.__dict__, **model_params),
             args)
