@@ -1,9 +1,12 @@
-Support code for "A model for temporal networks benchmark generation to assess community structure dynamics"
-============================================================================================================
+Dynamic benchmark resources
+===========================
 
-Source code repository is in ``git`` in the `git repository
-<https://git.becs.aalto.fi/rkdarst/dynbench>`_.  Full documentation is
-found in the `README <README.pdf>`_.
+This code and documentation supports the paper "Benchmark model to
+assess community structure in evolving networks" [`arxiv
+<http://arxiv.org/abs/1501.05808>`_\ ].
+
+For full information on the code, please see ``MANUAL.tex``.  A PDF
+version is available under `releases <https://github.com/rkdarst/dynbench/releases>`
 
 Dependencies:
 
@@ -14,18 +17,16 @@ Dependencies:
   package for network and community analysis.  Not in any
   distribution, but can simply be placed in ``PYTHONPATH``.
 
+For convenience, I have a ``.tar.bz2`` that has the benchmark code,
+plus local copies of ``networkx`` and ``pcd`` included.  This is the
+``dynbench-fulldist-* from the corresponding `github releases
+<https://github.com/rkdarst/dynbench/releases>`_ page.
+
+
+
 Version history
 ---------------
 * `Latest development
   <https://git.becs.aalto.fi/rkdarst/dynbench/repository/archive.tar.bz2>`_
-
-
-Packaged distribution
----------------------
-
-For convenience, I have a ``.tar.bz2`` that has the benchmark code,
-plus local copies of ``networkx`` and ``pcd`` included.  The version
-suffix corresponds to the ``git`` version, for older versions please
-get code straight from git.
-
-* `Full distribution <dynbench-fulldist-b8433f6.tar.bz2>`_
+* The original version corresponding to our first paper is at tag
+  ``v0.1.0``.  Downloads are at  https://github.com/rkdarst/dynbench/releases/v0.1.0.
